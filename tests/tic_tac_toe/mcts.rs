@@ -34,11 +34,12 @@ pub fn assert_search(
                     board.place(vertex, current_turn);
                     TicTacToeState::new(board, -current_turn)
                 };
-
-                search_tree.update(trace, Some(state), TicTacToeUpdate::new(
+                let update = TicTacToeUpdate::new(
                     state.evaluate(&mut prng),
                     state.turn()
-                ));
+                );
+
+                search_tree.update(trace, Some(state), update);
             },
             Ok((trace, (state, _))) => {
                 let update = TicTacToeUpdate::new(

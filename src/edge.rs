@@ -1,6 +1,4 @@
-use crate::{
-    process::Process
-};
+use crate::process::Process;
 
 /// Reserved value for the `ptr` field that indicates that this edge has not
 /// yet been expanded.

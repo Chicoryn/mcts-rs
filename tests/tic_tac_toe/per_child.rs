@@ -1,6 +1,6 @@
 use super::{TicTacToeState, TicTacToeUpdate};
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct TicTacToePerChild {
     value: f32,
     visits: usize,

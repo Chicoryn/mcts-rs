@@ -6,7 +6,6 @@ use smallvec::SmallVec;
 
 use super::{TicTacToe, TicTacToeUpdate};
 
-#[derive(Clone, Copy)]
 pub struct TicTacToeState {
     board: TicTacToe,
     current_turn: i8,

@@ -19,7 +19,7 @@ impl<P: Process> Node<P> {
     }
 
     pub(super) fn best(&self, process: &P) -> Option<&Edge<P>> {
-        if let Some(per_child) = process.best(&self.state, self.edges.iter().map(|edge| *edge.per_child())) {
+        if let Some(per_child) = process.best(&self.state, self.edges.iter().map(|edge| edge.per_child().clone())) {
             self.edges.iter()
                 .filter(|edge| edge.per_child().eq(&per_child))
                 .next()
@@ -60,7 +60,7 @@ impl<P: Process> Node<P> {
     }
 
     pub(super) fn select(&self, process: &P) -> Option<P::PerChild> {
-        process.select(&self.state, self.edges.iter().map(|edge| *edge.per_child()))
+        process.select(&self.state, self.edges.iter().map(|edge| edge.per_child().clone()))
     }
 }
 

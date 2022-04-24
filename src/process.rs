@@ -1,6 +1,6 @@
 pub trait Process {
-    type State: Copy;
-    type PerChild: Copy + PartialEq;
+    type State;
+    type PerChild: Clone + PartialEq;
     type Update;
 
     /// Returns the _best_ edge to *play* for a given `state` and set of
