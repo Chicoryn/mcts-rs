@@ -33,14 +33,20 @@ impl<P: Process> Edge<P> {
         self.ptr != EXPANDING
     }
 
-    /// Set the destination node of this edge to the given `new_ptr`.
+    /// Set the destination node of this edge to the given `new_ptr` if this
+    /// edge does not have a destination. Return true iff this edge was updated.
     ///
     /// # Arguments
     ///
     /// * `new_ptr` -
     ///
-    pub fn insert(&mut self, new_ptr: usize) {
-        self.ptr = new_ptr;
+    pub fn try_insert(&mut self, new_ptr: usize) -> bool {
+        if self.is_valid() {
+            return false;
+        } else {
+            self.ptr = new_ptr;
+            return true;
+        }
     }
 
     /// Returns a reference to the `per_child` of this edge.
@@ -64,9 +70,17 @@ mod tests {
         let mut edge = Edge::<FakeProcess>::new(37);
 
         assert_eq!(edge.is_valid(), false);
-        edge.insert(1);
+        assert_eq!(edge.try_insert(1), true);
         assert_eq!(edge.ptr(), 1);
         assert_eq!(edge.is_valid(), true);
+    }
+
+    #[test]
+    fn check_double_insert() {
+        let mut edge = Edge::<FakeProcess>::new(37);
+
+        assert_eq!(edge.try_insert(1), true);
+        assert_eq!(edge.try_insert(1), false);
     }
 
     #[test]

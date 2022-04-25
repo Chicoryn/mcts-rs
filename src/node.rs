@@ -91,7 +91,7 @@ mod tests {
 
         assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::Success));
         let (_, edge) = node.as_node_struct(0);
-        edge.insert(255);
+        assert_eq!(edge.try_insert(255), true);
 
         assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::AlreadyExpanded(255)));
     }

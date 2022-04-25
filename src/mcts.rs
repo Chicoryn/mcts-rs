@@ -52,7 +52,7 @@ impl<P: Process> Mcts<P> {
         out
     }
 
-    /// Returns a trace 
+    /// Returns a trace
     pub fn probe(&mut self) -> Result<Trace, ProbeStatus> {
         let mut steps = SmallVec::new();
         let mut curr = self.root;
@@ -81,12 +81,13 @@ impl<P: Process> Mcts<P> {
     }
 
     fn insert(&mut self, trace: &Trace, new_state: P::State) {
-        let new_child = self.slab.insert(Node::new(new_state));
-
         if let Some(last_step) = trace.steps().last() {
+            let new_child = self.slab.insert(Node::new(new_state));
             let edge = last_step.as_edge(self);
 
-            edge.insert(new_child);
+            if !edge.try_insert(new_child) {
+                self.slab.remove(new_child);
+            }
         }
     }
 
