@@ -22,19 +22,19 @@ impl Process for TicTacToeProcess {
         let mut occupied = [false; 9];
         let best_edge = edges.max_by_key(|edge| {
             occupied[edge.vertex()] = true;
-            edge.uct(state.visits())
+            edge.uct(state)
         });
         let zero_edge = (0..9)
             .filter(|&vertex| !occupied[vertex] && state.is_valid(vertex))
             .next()
-            .map(|vertex| TicTacToePerChild::new(0.0, vertex));
+            .map(|vertex| TicTacToePerChild::new(vertex));
 
         match (best_edge, zero_edge) {
             (None, None) => None,
             (None, Some(zero)) => Some(zero),
             (Some(best), None) => Some(best),
             (Some(best), Some(zero)) => {
-                if zero.uct(state.visits()) > best.uct(state.visits()) {
+                if zero.uct(&state) > best.uct(&state) {
                     Some(zero)
                 } else {
                     Some(best)
@@ -47,8 +47,4 @@ impl Process for TicTacToeProcess {
         state.update(update);
         per_child.update(state, update);
     }
-}
-
-impl TicTacToeProcess {
-
 }

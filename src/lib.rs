@@ -5,6 +5,7 @@ mod probe_status;
 mod process;
 mod step;
 mod trace;
+pub mod uct;
 
 pub use self::mcts::*;
 pub use self::probe_status::*;

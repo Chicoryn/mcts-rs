@@ -14,6 +14,14 @@ pub struct Mcts<P: Process> {
 }
 
 impl<P: Process> Mcts<P> {
+    /// Returns a new monte-carlo search tree for the given `process` and
+    /// initial `state`.
+    ///
+    /// # Arguments
+    ///
+    /// * `process` -
+    /// * `state` -
+    ///
     pub fn new(process: P, state: P::State) -> Self {
         let mut slab = Slab::new();
         let root = slab.insert(Node::new(state));
@@ -21,10 +29,13 @@ impl<P: Process> Mcts<P> {
         Self { root, process, slab }
     }
 
+    /// Returns the root node of this search tree.
     pub fn root(&self) -> &P::State {
         &self.slab[self.root].state()
     }
 
+    /// Returns the _best_ sequence of nodes and edges through this search
+    /// tree.
     pub fn path(&self) -> Vec<(&P::State, &P::PerChild)> {
         let mut node = &self.slab[self.root];
         let mut out = Vec::with_capacity(16);
@@ -41,6 +52,7 @@ impl<P: Process> Mcts<P> {
         out
     }
 
+    /// Returns a trace 
     pub fn probe(&mut self) -> Result<Trace, ProbeStatus> {
         let mut steps = SmallVec::new();
         let mut curr = self.root;

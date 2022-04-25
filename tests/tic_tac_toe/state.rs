@@ -3,14 +3,14 @@ use rand::{
     Rng
 };
 use smallvec::SmallVec;
+use mcts_rs::uct;
 
 use super::{TicTacToe, TicTacToeUpdate};
 
 pub struct TicTacToeState {
     board: TicTacToe,
     current_turn: i8,
-
-    total_visits: usize
+    uct: uct::State
 }
 
 impl TicTacToeState {
@@ -22,7 +22,7 @@ impl TicTacToeState {
     pub fn new(board: TicTacToe, current_turn: i8) -> Self {
         Self {
             board, current_turn,
-            total_visits: 0
+            uct: uct::State::new()
         }
     }
 
@@ -43,11 +43,15 @@ impl TicTacToeState {
     }
 
     pub fn visits(&self) -> usize {
-        self.total_visits
+        self.uct.visits()
+    }
+
+    pub fn uct(&self) -> &uct::State {
+        &self.uct
     }
 
     pub fn update(&mut self, _: &TicTacToeUpdate) {
-        self.total_visits += 1;
+        self.uct.update()
     }
 
     pub fn evaluate(&self, prng: &mut impl Rng) -> f32 {
