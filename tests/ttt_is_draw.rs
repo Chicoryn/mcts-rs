@@ -7,7 +7,7 @@ fn is_draw() {
         tic_tac_toe::TicTacToeState::starting_point(),
         |mcts| {
             if let Some(step) = mcts.path().steps().first() {
-                step.map(mcts, |_, per_child| {
+                step.map(|_, per_child| {
                     0.48 <= per_child.value() && per_child.value() <= 0.52
                 })
             } else {

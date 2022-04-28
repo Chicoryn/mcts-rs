@@ -21,7 +21,7 @@ fn x_wins() {
         tic_tac_toe::TicTacToeState::new(board, 1),
         |mcts| {
             if let Some(step) = mcts.path().steps().first() {
-                step.map(mcts, |_, per_child| {
+                step.map(|_, per_child| {
                     per_child.value() >= 0.98 && (per_child.vertex() == 0 || per_child.vertex() == 6)
                 })
             } else {
@@ -52,7 +52,7 @@ fn o_wins() {
         tic_tac_toe::TicTacToeState::new(board, -1),
         |mcts| {
             if let Some(step) = mcts.path().steps().first() {
-                step.map(mcts, |_, per_child| {
+                step.map(|_, per_child| {
                     per_child.value() >= 0.98 && per_child.vertex() == 2
                 })
             } else {

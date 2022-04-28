@@ -3,14 +3,15 @@ use crate::{
     mcts::Mcts,
 };
 
-pub struct Step {
+pub struct Step<'a, P: Process> {
+    pub(super) search_tree: &'a Mcts<P>,
     pub(super) ptr: usize,
     pub(super) sparse_index: usize
 }
 
-impl Step {
-    pub(super) fn new(ptr: usize, sparse_index: usize) -> Self {
-        Self { ptr, sparse_index }
+impl<'a, P: Process> Step<'a, P> {
+    pub(super) fn new(search_tree: &'a Mcts<P>, ptr: usize, sparse_index: usize) -> Self {
+        Self { search_tree, ptr, sparse_index }
     }
 
     /// Returns the process `state` and `per_child` that was chosen for this step.
@@ -19,7 +20,7 @@ impl Step {
     ///
     /// - `search_tree` -
     ///
-    pub fn map<P: Process, T>(&self, search_tree: &Mcts<P>, f: impl FnOnce(&P::State, &P::PerChild) -> T) -> T {
-        search_tree.slab.read()[self.ptr].map(self.sparse_index, |state, edge| f(state, edge.per_child()))
+    pub fn map<T>(&self, f: impl FnOnce(&P::State, &P::PerChild) -> T) -> T {
+        self.search_tree.slab.read()[self.ptr].map(self.sparse_index, |state, edge| f(state, edge.per_child()))
     }
 }

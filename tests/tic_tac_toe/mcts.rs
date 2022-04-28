@@ -6,10 +6,10 @@ use mcts_rs::{Mcts, ProbeStatus, Trace};
 
 use super::*;
 
-fn is_expandable(search_tree: &Mcts<TicTacToeProcess>, trace: &Trace) -> bool {
+fn is_expandable(trace: &Trace<'_, TicTacToeProcess>) -> bool {
     let last_step = trace.steps().last().unwrap();
 
-    last_step.map(search_tree, |state, _| !state.is_terminal() && state.visits() >= 8)
+    last_step.map(|state, _| !state.is_terminal() && state.visits() >= 8)
 }
 
 pub fn assert_search(
@@ -29,9 +29,9 @@ pub fn assert_search(
                 Err(ProbeStatus::NoChildren)
             }
         }) {
-            Ok(trace) if is_expandable(&search_tree, &trace) => {
+            Ok(trace) if is_expandable(&trace) => {
                 let last_step = trace.steps().last().unwrap();
-                let (state, update) = last_step.map(&search_tree, |state, per_child| {
+                let (state, update) = last_step.map(|state, per_child| {
                     let state = {
                         let mut board = state.board().clone();
                         let current_turn = state.turn();
@@ -52,7 +52,7 @@ pub fn assert_search(
             },
             Ok(trace) => {
                 let last_step = trace.steps().last().unwrap();
-                let update = last_step.map(&search_tree, |state, _| {
+                let update = last_step.map(|state, _| {
                     TicTacToeUpdate::new(
                         state.evaluate(&mut prng),
                         state.turn()

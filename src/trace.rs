@@ -2,17 +2,18 @@ use smallvec::SmallVec;
 
 use crate::{
     probe_status::ProbeStatus,
+    process::Process,
     step::Step,
 };
 
-pub struct Trace {
-    steps: SmallVec<[Step; 8]>,
+pub struct Trace<'a, P: Process> {
+    steps: SmallVec<[Step<'a, P>; 8]>,
     status: ProbeStatus
 }
 
-impl Trace {
+impl<'a, P: Process> Trace<'a, P> {
     /// Returns a new trace with the given `steps` and `status`.
-    pub fn new(steps: SmallVec<[Step; 8]>, status: ProbeStatus) -> Self {
+    pub fn new(steps: SmallVec<[Step<'a, P>; 8]>, status: ProbeStatus) -> Self {
         Self { steps, status }
     }
 
@@ -22,7 +23,7 @@ impl Trace {
     }
 
     /// Returns the steps in this trace.
-    pub fn steps(&self) -> &[Step] {
+    pub fn steps(&self) -> &[Step<'a, P>] {
         &self.steps
     }
 
@@ -35,20 +36,16 @@ impl Trace {
 #[cfg(test)]
 mod tests {
     use smallvec::smallvec;
+    use crate::FakeProcess;
     use super::*;
 
     #[test]
     fn check_empty() {
-        assert!(Trace::new(smallvec! [], ProbeStatus::Success).is_empty());
-    }
-
-    #[test]
-    fn check_non_empty() {
-        assert!(!Trace::new(smallvec! [Step::new(0, 0)], ProbeStatus::Success).is_empty());
+        assert!(Trace::<FakeProcess>::new(smallvec! [], ProbeStatus::Success).is_empty());
     }
 
     #[test]
     fn check_status() {
-        assert_eq!(Trace::new(smallvec! [], ProbeStatus::AlreadyExpanding).status(), ProbeStatus::AlreadyExpanding);
+        assert_eq!(Trace::<FakeProcess>::new(smallvec! [], ProbeStatus::AlreadyExpanding).status(), ProbeStatus::AlreadyExpanding);
     }
 }

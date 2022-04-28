@@ -37,14 +37,14 @@ impl<P: Process> Mcts<P> {
 
     /// Returns the _best_ sequence of nodes and edges through this search
     /// tree.
-    pub fn path(&self) -> Trace {
+    pub fn path<'a>(&'a self) -> Trace<'a, P> {
         let slab = self.slab.read();
         let mut steps = SmallVec::new();
         let mut curr = self.root;
         let mut node = &slab[curr];
 
         while let Some((sparse_index, edge)) = node.best(&self.process) {
-            steps.push(Step::new(curr, sparse_index));
+            steps.push(Step::new(self, curr, sparse_index));
 
             if !edge.is_valid() {
                 break
@@ -58,7 +58,7 @@ impl<P: Process> Mcts<P> {
     }
 
     /// Returns a trace
-    pub fn probe(&self) -> Result<Trace, ProbeStatus> {
+    pub fn probe<'a>(&'a self) -> Result<Trace<'a, P>, ProbeStatus> {
         let slab = self.slab.read();
         let mut steps = SmallVec::new();
         let mut curr = self.root;
@@ -74,11 +74,11 @@ impl<P: Process> Mcts<P> {
 
             match node.try_set_expanding(next_index) {
                 (sparse_index, ProbeStatus::AlreadyExpanded(next_index)) => {
-                    steps.push(Step::new(curr, sparse_index));
+                    steps.push(Step::new(self, curr, sparse_index));
                     curr = next_index;
                 },
                 (sparse_index, status) => {
-                    steps.push(Step::new(curr, sparse_index));
+                    steps.push(Step::new(self, curr, sparse_index));
 
                     return Ok(Trace::new(steps, status))
                 },
@@ -86,7 +86,7 @@ impl<P: Process> Mcts<P> {
         }
     }
 
-    fn insert(&self, trace: &Trace, new_state: P::State) -> RwLockReadGuard<Slab<Node<P>>> {
+    fn insert(&self, trace: &Trace<'_, P>, new_state: P::State) -> RwLockReadGuard<Slab<Node<P>>> {
         let mut slab = self.slab.write();
 
         if let Some(last_step) = trace.steps().last() {
@@ -102,7 +102,7 @@ impl<P: Process> Mcts<P> {
         RwLockWriteGuard::downgrade(slab)
     }
 
-    pub fn update(&self, trace: Trace, state: Option<P::State>, up: P::Update) {
+    pub fn update(&self, trace: Trace<'_, P>, state: Option<P::State>, up: P::Update) {
         let slab =
             if let Some(new_state) = state {
                 self.insert(&trace, new_state)

@@ -158,22 +158,22 @@ fn quantify(x: f32) -> u64 {
     (u16::MAX as f32 * x) as u64
 }
 
-fn is_expandable(search_tree: &mut Mcts<SticksProcess>, trace: &Trace) -> bool {
-    trace.steps().last().map(|s| s.map(search_tree, |_, per_child| per_child.uct.visits() > 8)).unwrap_or(false)
+fn is_expandable(trace: &Trace<'_, SticksProcess>) -> bool {
+    trace.steps().last().map(|s| s.map(|_, per_child| per_child.uct.visits() > 8)).unwrap_or(false)
 }
 
 pub fn search(n: usize) -> Mcts<SticksProcess> {
     let rng = Rc::new(RefCell::new(StdRng::seed_from_u64(0xdeadbeef)));
-    let mut search_tree = Mcts::new(
+    let search_tree = Mcts::new(
         SticksProcess { rng: rng.clone() },
         SticksState::new(1, Sticks::new())
     );
 
     while search_tree.root().uct.visits() < n {
         match search_tree.probe() {
-            Ok(trace) if !trace.is_empty() && is_expandable(&mut search_tree, &trace) => {
+            Ok(trace) if !trace.is_empty() && is_expandable(&trace) => {
                 let new_state = {
-                    trace.steps().last().map(|s| s.map(&search_tree, |state, per_child| {
+                    trace.steps().last().map(|s| s.map(|state, per_child| {
                         let new_sticks = state.sticks.play(per_child.num_taken);
 
                         SticksState::new(-state.side, new_sticks)
@@ -185,7 +185,7 @@ pub fn search(n: usize) -> Mcts<SticksProcess> {
             },
             Ok(trace) if !trace.is_empty() => {
                 let update = trace.steps().last().map(|s| {
-                    s.map(&search_tree, |state, per_child| {
+                    s.map(|state, per_child| {
                         per_child.evaluate(&state, rng.borrow_mut().deref_mut())
                     })
                 }).unwrap();
