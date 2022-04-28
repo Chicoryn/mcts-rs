@@ -43,7 +43,7 @@ impl Process for TicTacToeProcess {
         }
     }
 
-    fn update(&self, state: &mut Self::State, per_child: &mut Self::PerChild, update: &Self::Update, _: bool) {
+    fn update(&self, state: &Self::State, per_child: &Self::PerChild, update: &Self::Update, _: bool) {
         state.update(update);
         per_child.update(state, update);
     }

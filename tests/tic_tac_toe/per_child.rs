@@ -29,7 +29,7 @@ impl TicTacToePerChild {
         self.vertex as usize
     }
 
-    pub fn update(&mut self, state: &TicTacToeState, update: &TicTacToeUpdate) {
+    pub fn update(&self, state: &TicTacToeState, update: &TicTacToeUpdate) {
         self.uct.update(&update.uct(state.turn()))
     }
 

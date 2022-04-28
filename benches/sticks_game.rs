@@ -144,7 +144,7 @@ impl Process for SticksProcess {
         }
     }
 
-    fn update(&self, state: &mut Self::State, per_child: &mut Self::PerChild, update: &Self::Update, _: bool) {
+    fn update(&self, state: &Self::State, per_child: &Self::PerChild, update: &Self::Update, _: bool) {
         state.uct.update();
         per_child.uct.update(&if state.side == update.side {
             update.uct.clone()
@@ -159,7 +159,7 @@ fn quantify(x: f32) -> u64 {
 }
 
 fn is_expandable(search_tree: &mut Mcts<SticksProcess>, trace: &Trace) -> bool {
-    trace.steps().last().map(|s| s.as_state(search_tree).0.uct.visits() > 8).unwrap_or(false)
+    trace.steps().last().map(|s| s.map(search_tree, |_, per_child| per_child.uct.visits() > 8)).unwrap_or(false)
 }
 
 pub fn search(n: usize) -> Mcts<SticksProcess> {
@@ -173,18 +173,22 @@ pub fn search(n: usize) -> Mcts<SticksProcess> {
         match search_tree.probe() {
             Ok(trace) if !trace.is_empty() && is_expandable(&mut search_tree, &trace) => {
                 let new_state = {
-                    let (state, per_child) = trace.steps().last().map(|s| s.as_state(&mut search_tree)).unwrap();
-                    let new_sticks = state.sticks.play(per_child.num_taken);
+                    trace.steps().last().map(|s| s.map(&search_tree, |state, per_child| {
+                        let new_sticks = state.sticks.play(per_child.num_taken);
 
-                    SticksState::new(-state.side, new_sticks)
+                        SticksState::new(-state.side, new_sticks)
+                    })).unwrap()
                 };
                 let update = new_state.evaluate(rng.borrow_mut().deref_mut());
 
                 search_tree.update(trace, Some(new_state), update);
             },
             Ok(trace) if !trace.is_empty() => {
-                let (state, per_child) = trace.steps().last().map(|s| s.as_state(&mut search_tree)).unwrap();
-                let update = per_child.evaluate(&state, rng.borrow_mut().deref_mut());
+                let update = trace.steps().last().map(|s| {
+                    s.map(&search_tree, |state, per_child| {
+                        per_child.evaluate(&state, rng.borrow_mut().deref_mut())
+                    })
+                }).unwrap();
 
                 search_tree.update(trace, None, update);
             },

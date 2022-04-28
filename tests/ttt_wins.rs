@@ -20,8 +20,10 @@ fn x_wins() {
         tic_tac_toe::TicTacToeProcess::new(),
         tic_tac_toe::TicTacToeState::new(board, 1),
         |mcts| {
-            if let Some((_, per_child)) = mcts.path().first() {
-                per_child.value() >= 0.98 && (per_child.vertex() == 0 || per_child.vertex() == 6)
+            if let Some(step) = mcts.path().steps().first() {
+                step.map(mcts, |_, per_child| {
+                    per_child.value() >= 0.98 && (per_child.vertex() == 0 || per_child.vertex() == 6)
+                })
             } else {
                 return false
             }
@@ -49,8 +51,10 @@ fn o_wins() {
         tic_tac_toe::TicTacToeProcess::new(),
         tic_tac_toe::TicTacToeState::new(board, -1),
         |mcts| {
-            if let Some((_, per_child)) = mcts.path().first() {
-                per_child.value() >= 0.98 && per_child.vertex() == 2
+            if let Some(step) = mcts.path().steps().first() {
+                step.map(mcts, |_, per_child| {
+                    per_child.value() >= 0.98 && per_child.vertex() == 2
+                })
             } else {
                 return false
             }

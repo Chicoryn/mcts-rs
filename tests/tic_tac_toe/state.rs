@@ -50,7 +50,7 @@ impl TicTacToeState {
         &self.uct
     }
 
-    pub fn update(&mut self, _: &TicTacToeUpdate) {
+    pub fn update(&self, _: &TicTacToeUpdate) {
         self.uct.update()
     }
 

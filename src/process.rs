@@ -34,7 +34,7 @@ pub trait Process {
     /// * `update` -
     /// * `is_expanded` -
     ///
-    fn update(&self, state: &mut Self::State, per_child: &mut Self::PerChild, update: &Self::Update, is_expanded: bool);
+    fn update(&self, state: &Self::State, per_child: &Self::PerChild, update: &Self::Update, is_expanded: bool);
 }
 
 #[cfg(test)]
@@ -54,7 +54,7 @@ impl Process for FakeProcess {
         Some(0)
     }
 
-    fn update(&self, _: &mut Self::State, _: &mut Self::PerChild, _: &Self::Update, _: bool) {
+    fn update(&self, _: &Self::State, _: &Self::PerChild, _: &Self::Update, _: bool) {
         // pass
     }
 }
