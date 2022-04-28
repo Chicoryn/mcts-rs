@@ -1,6 +1,16 @@
+pub trait PerChild {
+    fn key(&self) -> usize;
+}
+
+pub enum SelectResult<P: PerChild> {
+    Add(P),
+    Existing(usize),
+    None
+}
+
 pub trait Process {
     type State;
-    type PerChild: Clone + PartialEq;
+    type PerChild: PerChild;
     type Update;
 
     /// Returns the _best_ edge to *play* for a given `state` and set of
@@ -11,7 +21,7 @@ pub trait Process {
     /// * `state` -
     /// * `edges` - all explored edges for the given `state`.
     ///
-    fn best(&self, state: &Self::State, edges: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild>;
+    fn best<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a;
 
     /// Returns the edge to be explored during search for a given `state` and
     /// set of already evaluated `edges`. If `None` is returned then this is
@@ -22,7 +32,7 @@ pub trait Process {
     /// * `state` -
     /// * `edges` -
     ///
-    fn select(&self, state: &Self::State, edges: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild>;
+    fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a;
 
     /// Update the statistics for this `state` and `per_child` based on a
     /// user-provided evaluation `update`.
@@ -38,20 +48,40 @@ pub trait Process {
 }
 
 #[cfg(test)]
+#[derive(Clone)]
+pub struct FakePerChild {
+    key: usize
+}
+
+#[cfg(test)]
+impl FakePerChild {
+    pub fn new(key: usize) -> Self {
+        Self { key }
+    }
+}
+
+#[cfg(test)]
+impl PerChild for FakePerChild {
+    fn key(&self) -> usize {
+        self.key
+    }
+}
+
+#[cfg(test)]
 pub struct FakeProcess;
 
 #[cfg(test)]
 impl Process for FakeProcess {
     type State = ();
-    type PerChild = usize;
+    type PerChild = FakePerChild;
     type Update = ();
 
-    fn best(&self, _: &Self::State, _: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild> {
+    fn best<'a>(&self, _: &Self::State, _: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a {
         Some(0)
     }
 
-    fn select(&self, _: &Self::State, _: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild> {
-        Some(0)
+    fn select<'a>(&self, _: &Self::State, _: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
+        SelectResult::Add(FakePerChild::new(0))
     }
 
     fn update(&self, _: &Self::State, _: &Self::PerChild, _: &Self::Update, _: bool) {

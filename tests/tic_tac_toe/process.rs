@@ -1,5 +1,5 @@
 use super::{TicTacToeState, TicTacToePerChild, TicTacToeUpdate};
-use mcts_rs::Process;
+use mcts_rs::{PerChild, Process, SelectResult};
 
 pub struct TicTacToeProcess;
 
@@ -14,11 +14,11 @@ impl Process for TicTacToeProcess {
     type PerChild = TicTacToePerChild;
     type Update = TicTacToeUpdate;
 
-    fn best(&self, _: &Self::State, edges: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild> {
-        edges.max_by_key(|edge| edge.visits())
+    fn best<'a>(&self, _: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a {
+        edges.max_by_key(|edge| edge.visits()).map(|edge| edge.key())
     }
 
-    fn select(&self, state: &Self::State, edges: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild> {
+    fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
         let mut occupied = [false; 9];
         let best_edge = edges.max_by_key(|edge| {
             occupied[edge.vertex()] = true;
@@ -30,14 +30,14 @@ impl Process for TicTacToeProcess {
             .map(|vertex| TicTacToePerChild::new(vertex));
 
         match (best_edge, zero_edge) {
-            (None, None) => None,
-            (None, Some(zero)) => Some(zero),
-            (Some(best), None) => Some(best),
+            (None, None) => SelectResult::None,
+            (None, Some(zero)) => SelectResult::Add(zero),
+            (Some(best), None) => SelectResult::Existing(best.key()),
             (Some(best), Some(zero)) => {
                 if zero.uct(&state) > best.uct(&state) {
-                    Some(zero)
+                    SelectResult::Add(zero)
                 } else {
-                    Some(best)
+                    SelectResult::Existing(best.key())
                 }
             }
         }

@@ -22,14 +22,9 @@ pub fn assert_search(
     let search_tree = Mcts::new(process, starting_point);
 
     while search_tree.root().visits() < 200 || !until(&search_tree) {
-        match search_tree.probe().and_then(|trace| {
-            if !trace.is_empty() {
-                Ok(trace)
-            } else {
-                Err(ProbeStatus::NoChildren)
-            }
-        }) {
-            Ok(trace) if is_expandable(&trace) => {
+        match search_tree.probe() {
+            (trace, ProbeStatus::Empty) if trace.is_empty() => { panic!() },
+            (trace, _) if is_expandable(&trace) => {
                 let last_step = trace.steps().last().unwrap();
                 let (state, update) = last_step.map(|state, per_child| {
                     let state = {
@@ -50,7 +45,7 @@ pub fn assert_search(
 
                 search_tree.update(trace, Some(state), update);
             },
-            Ok(trace) => {
+            (trace, _) => {
                 let last_step = trace.steps().last().unwrap();
                 let update = last_step.map(|state, _| {
                     TicTacToeUpdate::new(
@@ -61,7 +56,6 @@ pub fn assert_search(
 
                 search_tree.update(trace, None, update)
             },
-            Err(_) => { panic!() }
         }
     }
 

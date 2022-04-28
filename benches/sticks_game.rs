@@ -10,7 +10,7 @@ use std::{
 use smallvec::SmallVec;
 use mcts_rs::{
     uct,
-    Process, Mcts, Trace
+    PerChild, Process, Mcts, Trace, SelectResult
 };
 
 #[derive(Clone)]
@@ -86,6 +86,12 @@ pub struct SticksPerChild {
     num_taken: usize
 }
 
+impl PerChild for SticksPerChild {
+    fn key(&self) -> usize {
+        self.num_taken
+    }
+}
+
 impl SticksPerChild {
     fn new(n: usize) -> Self {
         Self {
@@ -122,11 +128,11 @@ impl Process for SticksProcess {
     type PerChild = SticksPerChild;
     type Update = SticksUpdate;
 
-    fn best(&self, _: &Self::State, edges: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild> {
-        edges.max_by_key(|per_child| per_child.uct.visits())
+    fn best<'a>(&self, _: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a {
+        edges.max_by_key(|per_child| per_child.uct.visits()).map(|per_child| per_child.key())
     }
 
-    fn select(&self, state: &Self::State, edges: impl Iterator<Item=Self::PerChild>) -> Option<Self::PerChild> {
+    fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
         let mut unexplored_moves = state.sticks.valid();
         let best_edge = edges.max_by_key(|per_child| {
             unexplored_moves.retain(|&mut n| n != per_child.num_taken);
@@ -135,12 +141,16 @@ impl Process for SticksProcess {
 
         if let Some(best_edge) = best_edge {
             if unexplored_moves.is_empty() || best_edge.uct.uct(&state.uct) > state.uct.baseline() {
-                Some(best_edge)
+                SelectResult::Existing(best_edge.key())
             } else {
                 unexplored_moves.choose(self.rng.borrow_mut().deref_mut()).map(|&n| Self::PerChild::new(n))
+                    .map(|per_child| SelectResult::Add(per_child))
+                    .unwrap_or(SelectResult::None)
             }
         } else {
             unexplored_moves.choose(self.rng.borrow_mut().deref_mut()).map(|&n| Self::PerChild::new(n))
+                .map(|per_child| SelectResult::Add(per_child))
+                .unwrap_or(SelectResult::None)
         }
     }
 
@@ -171,7 +181,7 @@ pub fn search(n: usize) -> Mcts<SticksProcess> {
 
     while search_tree.root().uct.visits() < n {
         match search_tree.probe() {
-            Ok(trace) if !trace.is_empty() && is_expandable(&trace) => {
+            (trace, _) if !trace.is_empty() && is_expandable(&trace) => {
                 let new_state = {
                     trace.steps().last().map(|s| s.map(|state, per_child| {
                         let new_sticks = state.sticks.play(per_child.num_taken);
@@ -183,7 +193,7 @@ pub fn search(n: usize) -> Mcts<SticksProcess> {
 
                 search_tree.update(trace, Some(new_state), update);
             },
-            Ok(trace) if !trace.is_empty() => {
+            (trace, _) if !trace.is_empty() => {
                 let update = trace.steps().last().map(|s| {
                     s.map(|state, per_child| {
                         per_child.evaluate(&state, rng.borrow_mut().deref_mut())
@@ -192,9 +202,7 @@ pub fn search(n: usize) -> Mcts<SticksProcess> {
 
                 search_tree.update(trace, None, update);
             },
-
-            Ok(_) => { panic!() }
-            Err(_) => { panic!() }
+            _ => { panic!() }
         }
     }
 

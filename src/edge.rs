@@ -62,12 +62,14 @@ impl<P: Process> Edge<P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::FakeProcess;
+    use crate::{PerChild, FakePerChild, FakeProcess};
     use super::*;
 
     #[test]
     fn check_valid() {
-        let mut edge = Edge::<FakeProcess>::new(37);
+        let mut edge = Edge::<FakeProcess>::new(
+            FakePerChild::new(37)
+        );
 
         assert_eq!(edge.is_valid(), false);
         assert_eq!(edge.try_insert(1), true);
@@ -77,7 +79,9 @@ mod tests {
 
     #[test]
     fn check_double_insert() {
-        let mut edge = Edge::<FakeProcess>::new(37);
+        let mut edge = Edge::<FakeProcess>::new(
+            FakePerChild::new(37)
+        );
 
         assert_eq!(edge.try_insert(1), true);
         assert_eq!(edge.try_insert(1), false);
@@ -85,10 +89,10 @@ mod tests {
 
     #[test]
     fn check_per_child() {
-        let mut edge = Edge::<FakeProcess>::new(1);
+        let edge = Edge::<FakeProcess>::new(
+            FakePerChild::new(1)
+        );
 
-        assert_eq!(*edge.per_child(), 1);
-        *edge.per_child_mut() = 2;
-        assert_eq!(*edge.per_child(), 2);
+        assert_eq!(edge.per_child().key(), 1);
     }
 }

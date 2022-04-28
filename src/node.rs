@@ -1,10 +1,11 @@
 use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
 use smallvec::*;
+use std::ops::Deref;
 
 use crate::{
     edge::Edge,
     probe_status::ProbeStatus,
-    process::Process
+    process::{PerChild, SelectResult, Process},
 };
 
 pub(super) struct Node<P: Process> {
@@ -22,14 +23,10 @@ impl<P: Process> Node<P> {
     pub(super) fn best(&self, process: &P) -> Option<(usize, MappedMutexGuard<Edge<P>>)> {
         let edges = self.edges.lock();
 
-        if let Some(per_child) = process.best(&self.state, edges.iter().map(|edge| edge.per_child().clone())) {
-            for (i, edge) in edges.iter().enumerate() {
-                if edge.per_child().eq(&per_child) {
-                    return Some((i, MutexGuard::map(edges, |edges| &mut edges[i])))
-                }
-            }
-
-            None
+        if let Some(key) = process.best(&self.state, edges.iter().map(|edge| edge.per_child())) {
+            edges.binary_search_by_key(&key, |edge| edge.per_child().key()).map(|i| {
+                (key, MutexGuard::map(edges, |edges| &mut edges[i]))
+            }).ok()
         } else {
             None
         }
@@ -39,77 +36,48 @@ impl<P: Process> Node<P> {
         &self.state
     }
 
-    pub(super) fn edge_mut(&mut self, sparse_index: usize) -> MappedMutexGuard<Edge<P>> {
-        MutexGuard::map(self.edges.lock(), |edges| &mut edges[sparse_index])
+    pub(super) fn edge_mut(&self, key: usize) -> MappedMutexGuard<Edge<P>> {
+        MutexGuard::map(self.edges.lock(), |edges| {
+            edges.binary_search_by_key(&key, |edge| edge.per_child().key()).map(|i| {
+                &mut edges[i]
+            }).unwrap()
+        })
     }
 
-    pub(super) fn try_set_expanding(&self, per_child: P::PerChild) -> (usize, ProbeStatus) {
-        let mut edges = self.edges.lock();
-
-        for (i, edge) in edges.iter_mut().enumerate() {
-            if edge.per_child().eq(&per_child) {
-                if edge.is_valid() {
-                    return (i, ProbeStatus::AlreadyExpanded(edge.ptr()))
-                } else {
-                    return (i, ProbeStatus::AlreadyExpanding)
-                }
-            }
-        }
-
-        ({
-            edges.push(Edge::new(per_child));
-            edges.len() - 1
-        }, ProbeStatus::Success)
-    }
-
-    pub(super) fn update(&self, process: &P, sparse_index: usize, up: &P::Update) {
-        let mut edge = MutexGuard::map(self.edges.lock(), |edges| &mut edges[sparse_index]);
+    pub(super) fn update(&self, process: &P, key: usize, up: &P::Update) {
+        let mut edge = self.edge_mut(key);
         let is_expanded = edge.is_valid();
 
         process.update(&self.state, edge.per_child_mut(), &up, is_expanded)
     }
 
-    pub(super) fn select(&self, process: &P) -> Option<P::PerChild> {
-        let edges = self.edges.lock();
+    pub(super) fn select(&self, process: &P) -> Option<(usize, ProbeStatus)> {
+        let mut edges = self.edges.lock();
+        let mut busy = ProbeStatus::Busy;
+        let key = match process.select(&self.state, edges.iter().map(|edge| edge.per_child())) {
+            SelectResult::Existing(key) => key,
+            SelectResult::Add(per_child) => {
+                let key = per_child.key();
+                edges.push(Edge::new(per_child));
+                edges.sort_unstable_by_key(|edge| edge.per_child().key());
+                busy = ProbeStatus::Expanded;
+                key
+            },
+            SelectResult::None => { return None }
+        };
 
-        process.select(&self.state, edges.iter().map(|edge| edge.per_child().clone()))
+        edges.binary_search_by_key(&key, |edge| edge.per_child().key()).map(|i| {
+            let edge = &edges[i];
+
+            if edge.is_valid() {
+                (key, ProbeStatus::Existing(edge.ptr()))
+            } else {
+                (key, busy)
+            }
+        }).ok()
     }
 
-    pub(super) fn map<T>(&self, sparse_index: usize, f: impl FnOnce(&P::State, &Edge<P>) -> T) -> T {
-        let edges = self.edges.lock();
-
-        f(&self.state, &edges[sparse_index])
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::FakeProcess;
-    use super::*;
-
-    #[test]
-    fn check_expanding() {
-        let node = Node::<FakeProcess>::new(());
-
-        assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::Success));
-        assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::AlreadyExpanding));
-    }
-
-    #[test]
-    fn check_double_expanding() {
-        let node = Node::<FakeProcess>::new(());
-
-        assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::Success));
-        assert_eq!(node.try_set_expanding(2), (1, ProbeStatus::Success));
-    }
-
-    #[test]
-    fn check_already_expanded() {
-        let mut node = Node::<FakeProcess>::new(());
-
-        assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::Success));
-        assert_eq!(node.edge_mut(0).try_insert(255), true);
-
-        assert_eq!(node.try_set_expanding(1), (0, ProbeStatus::AlreadyExpanded(255)));
+    pub(super) fn map<T>(&self, key: usize, f: impl FnOnce(&P::State, &Edge<P>) -> T) -> T {
+        f(&self.state, self.edge_mut(key).deref())
     }
 }

@@ -43,8 +43,8 @@ impl<P: Process> Mcts<P> {
         let mut curr = self.root;
         let mut node = &slab[curr];
 
-        while let Some((sparse_index, edge)) = node.best(&self.process) {
-            steps.push(Step::new(self, curr, sparse_index));
+        while let Some((key, edge)) = node.best(&self.process) {
+            steps.push(Step::new(self, curr, key));
 
             if !edge.is_valid() {
                 break
@@ -54,35 +54,28 @@ impl<P: Process> Mcts<P> {
             node = &slab[curr];
         }
 
-        Trace::new(steps, ProbeStatus::Success)
+        Trace::new(steps)
     }
 
     /// Returns a trace
-    pub fn probe<'a>(&'a self) -> Result<Trace<'a, P>, ProbeStatus> {
+    pub fn probe<'a>(&'a self) -> (Trace<'a, P>, ProbeStatus) {
         let slab = self.slab.read();
         let mut steps = SmallVec::new();
         let mut curr = self.root;
 
         loop {
-            let node = &slab[curr];
-            let next_index = match node.select(&self.process) {
-                Some(next_index) => next_index,
-                None => {
-                    return Ok(Trace::new(steps, ProbeStatus::NoChildren))
-                }
+            match slab[curr].select(&self.process) {
+                Some((next_key, ProbeStatus::Existing(next_ptr))) => {
+                    steps.push(Step::new(self, curr, next_key));
+                    curr = next_ptr;
+                },
+                Some((next_key, status)) => {
+                    steps.push(Step::new(self, curr, next_key));
+
+                    return (Trace::new(steps), status);
+                },
+                None => { return (Trace::new(steps), ProbeStatus::Empty) }
             };
-
-            match node.try_set_expanding(next_index) {
-                (sparse_index, ProbeStatus::AlreadyExpanded(next_index)) => {
-                    steps.push(Step::new(self, curr, sparse_index));
-                    curr = next_index;
-                },
-                (sparse_index, status) => {
-                    steps.push(Step::new(self, curr, sparse_index));
-
-                    return Ok(Trace::new(steps, status))
-                },
-            }
         }
     }
 
@@ -91,7 +84,7 @@ impl<P: Process> Mcts<P> {
 
         if let Some(last_step) = trace.steps().last() {
             let new_child = slab.insert(Node::new(new_state));
-            let mut edge = slab[last_step.ptr].edge_mut(last_step.sparse_index);
+            let mut edge = slab[last_step.ptr].edge_mut(last_step.key);
 
             if !edge.try_insert(new_child) {
                 drop(edge);
@@ -113,7 +106,7 @@ impl<P: Process> Mcts<P> {
         for step in trace.steps() {
             let node = &slab[step.ptr];
 
-            node.update(&self.process, step.sparse_index, &up);
+            node.update(&self.process, step.key, &up);
         }
     }
 }

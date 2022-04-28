@@ -1,5 +1,5 @@
 use super::{TicTacToeState, TicTacToeUpdate};
-use mcts_rs::uct;
+use mcts_rs::{uct, PerChild};
 
 #[derive(Clone)]
 pub struct TicTacToePerChild {
@@ -7,9 +7,9 @@ pub struct TicTacToePerChild {
     vertex: u32
 }
 
-impl PartialEq for TicTacToePerChild {
-    fn eq(&self, other: &Self) -> bool {
-        self.vertex == other.vertex
+impl PerChild for TicTacToePerChild {
+    fn key(&self) -> usize {
+        self.vertex as usize
     }
 }
 
