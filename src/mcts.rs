@@ -1,5 +1,5 @@
-use slab::Slab;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableReadGuard};
+use slab::Slab;
 use smallvec::SmallVec;
 
 use crate::{
@@ -41,9 +41,8 @@ impl<P: Process> Mcts<P> {
         let slab = self.slab.read();
         let mut steps = SmallVec::new();
         let mut curr = self.root;
-        let mut node = &slab[curr];
 
-        while let Some((key, edge)) = node.best(&self.process) {
+        while let Some((key, edge)) = slab[curr].best(&self.process) {
             steps.push(Step::new(self, curr, key));
 
             if !edge.is_valid() {
@@ -51,7 +50,6 @@ impl<P: Process> Mcts<P> {
             }
 
             curr = edge.ptr();
-            node = &slab[curr];
         }
 
         Trace::new(steps)

@@ -38,7 +38,7 @@ impl PerChild {
         self.total_value.fetch_update(Ordering::AcqRel, Ordering::Acquire, |prev_value| {
             Some((f32::from_bits(prev_value) + up.value()).to_bits())
         }).unwrap();
-        self.visits.fetch_add(1, Ordering::Acquire);
+        self.visits.fetch_add(1, Ordering::AcqRel);
     }
 
     fn total_value(&self) -> f32 {

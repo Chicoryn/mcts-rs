@@ -16,7 +16,7 @@ impl State {
     }
 
     pub fn update(&self) {
-        self.visits.fetch_add(1, Ordering::Acquire);
+        self.visits.fetch_add(1, Ordering::AcqRel);
     }
 
     pub fn baseline(&self) -> f32 {

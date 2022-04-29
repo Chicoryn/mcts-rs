@@ -2,15 +2,9 @@ use rand::{
     rngs::StdRng,
     SeedableRng
 };
-use mcts_rs::{Mcts, ProbeStatus, Trace};
+use mcts_rs::{Mcts, ProbeStatus};
 
 use super::*;
-
-fn is_expandable(trace: &Trace<'_, TicTacToeProcess>) -> bool {
-    let last_step = trace.steps().last().unwrap();
-
-    last_step.map(|state, _| !state.is_terminal() && state.visits() >= 8)
-}
 
 pub fn assert_search(
     process: TicTacToeProcess,
@@ -24,38 +18,28 @@ pub fn assert_search(
     while search_tree.root().visits() < 200 || !until(&search_tree) {
         match search_tree.probe() {
             (trace, ProbeStatus::Empty) if trace.is_empty() => { panic!() },
-            (trace, _) if is_expandable(&trace) => {
-                let last_step = trace.steps().last().unwrap();
-                let (state, update) = last_step.map(|state, per_child| {
-                    let state = {
-                        let mut board = state.board().clone();
-                        let current_turn = state.turn();
-                        let vertex = per_child.vertex();
-
-                        board.place(vertex, current_turn);
-                        TicTacToeState::new(board, -current_turn)
-                    };
-                    let update = TicTacToeUpdate::new(
-                        state.evaluate(&mut prng),
-                        state.turn()
-                    );
-
-                    (state, update)
-                });
-
-                search_tree.update(trace, Some(state), update);
-            },
             (trace, _) => {
                 let last_step = trace.steps().last().unwrap();
-                let update = last_step.map(|state, _| {
-                    TicTacToeUpdate::new(
-                        state.evaluate(&mut prng),
-                        state.turn()
+                let (new_state, is_expandable) = last_step.map(|state, per_child| {
+                    let mut board = state.board().clone();
+                    board.place(per_child.vertex(), state.turn());
+
+                    (
+                        TicTacToeState::new(board, -state.turn()),
+                        !state.is_terminal() && state.visits() >= 8
                     )
                 });
+                let update = TicTacToeUpdate::new(
+                    new_state.evaluate(&mut prng),
+                    new_state.turn()
+                );
 
-                search_tree.update(trace, None, update)
-            },
+                if is_expandable {
+                    search_tree.update(trace, Some(new_state), update);
+                } else {
+                    search_tree.update(trace, None, update);
+                }
+            }
         }
     }
 
