@@ -252,12 +252,15 @@ fn search_goban(num_threads: usize, limit: u32) -> Mcts<GobanProcess> {
     Arc::try_unwrap(search_tree).map_err(|_| ()).unwrap()
 }
 
-fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("goban 1 1600", |b| b.iter(|| search_goban(1, black_box(1600))));
-    c.bench_function("goban 2 1600", |b| b.iter(|| search_goban(2, black_box(1600))));
-    c.bench_function("goban 4 1600", |b| b.iter(|| search_goban(4, black_box(1600))));
-    c.bench_function("goban 8 1600", |b| b.iter(|| search_goban(8, black_box(1600))));
+fn goban_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("goban");
+
+    group.significance_level(0.1).sample_size(10);
+    group.bench_function("1 800", |b| b.iter(|| search_goban(1, black_box(800))));
+    group.bench_function("2 800", |b| b.iter(|| search_goban(2, black_box(800))));
+    group.bench_function("4 800", |b| b.iter(|| search_goban(4, black_box(800))));
+    group.bench_function("8 800", |b| b.iter(|| search_goban(8, black_box(800))));
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(benches, goban_benchmark);
 criterion_main!(benches);
