@@ -1,16 +1,16 @@
 use crate::{
-    process::Process,
+    process::{PerChild, Process},
     mcts::Mcts,
 };
 
 pub struct Step<'a, P: Process> {
     pub(super) search_tree: &'a Mcts<P>,
     pub(super) ptr: usize,
-    pub(super) key: usize
+    pub(super) key: <P::PerChild as PerChild>::Key
 }
 
 impl<'a, P: Process> Step<'a, P> {
-    pub(super) fn new(search_tree: &'a Mcts<P>, ptr: usize, key: usize) -> Self {
+    pub(super) fn new(search_tree: &'a Mcts<P>, ptr: usize, key: <P::PerChild as PerChild>::Key) -> Self {
         Self { search_tree, ptr, key }
     }
 

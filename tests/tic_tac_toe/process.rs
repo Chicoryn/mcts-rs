@@ -14,7 +14,7 @@ impl Process for TicTacToeProcess {
     type PerChild = TicTacToePerChild;
     type Update = TicTacToeUpdate;
 
-    fn best<'a>(&self, _: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a {
+    fn best<'a>(&self, _: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<<Self::PerChild as PerChild>::Key> where Self::PerChild: 'a {
         edges.max_by_key(|edge| edge.visits()).map(|edge| edge.key())
     }
 

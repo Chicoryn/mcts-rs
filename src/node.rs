@@ -18,7 +18,7 @@ impl<P: Process> Node<P> {
         Self { state, edges }
     }
 
-    pub(super) fn best(&self, process: &P) -> Option<(usize, &Edge<P>)> {
+    pub(super) fn best(&self, process: &P) -> Option<(<P::PerChild as PerChild>::Key, &Edge<P>)> {
         if let Some(key) = process.best(&self.state, self.edges.iter().map(|edge| edge.per_child())) {
             Some((key, self.edge(key)))
         } else {
@@ -30,26 +30,26 @@ impl<P: Process> Node<P> {
         &self.state
     }
 
-    pub(super) fn edge(&self, key: usize) -> &Edge<P> {
+    pub(super) fn edge(&self, key: <<P as Process>::PerChild as PerChild>::Key) -> &Edge<P> {
         self.edges.binary_search_by_key(&key, |edge| edge.per_child().key()).map(|i| {
             &self.edges[i]
         }).unwrap()
     }
 
-    pub(super) fn edge_mut(&mut self, key: usize) -> &mut Edge<P> {
+    pub(super) fn edge_mut(&mut self, key: <<P as Process>::PerChild as PerChild>::Key) -> &mut Edge<P> {
         self.edges.binary_search_by_key(&key, |edge| edge.per_child().key()).map(|i| {
             &mut self.edges[i]
         }).unwrap()
     }
 
-    pub(super) fn update(&self, process: &P, key: usize, up: &P::Update) {
+    pub(super) fn update(&self, process: &P, key: <P::PerChild as PerChild>::Key, up: &P::Update) {
         let edge = self.edge(key);
         let is_expanded = edge.is_valid();
 
         process.update(&self.state, edge.per_child(), &up, is_expanded)
     }
 
-    pub(super) fn try_expand(&mut self, per_child: P::PerChild) -> (usize, ProbeStatus) {
+    pub(super) fn try_expand(&mut self, per_child: P::PerChild) -> (<P::PerChild as PerChild>::Key, ProbeStatus) {
         let key = per_child.key();
 
         self.edges.push(Edge::new(per_child));
@@ -62,7 +62,7 @@ impl<P: Process> Node<P> {
         process.select(&self.state, self.edges.iter().map(|edge| edge.per_child()))
     }
 
-    pub(super) fn map<T>(&self, key: usize, f: impl FnOnce(&P::State, &Edge<P>) -> T) -> T {
+    pub(super) fn map<T>(&self, key: <P::PerChild as PerChild>::Key, f: impl FnOnce(&P::State, &Edge<P>) -> T) -> T {
         f(&self.state, self.edge(key))
     }
 }

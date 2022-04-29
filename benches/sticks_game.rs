@@ -87,7 +87,9 @@ pub struct SticksPerChild {
 }
 
 impl PerChild for SticksPerChild {
-    fn key(&self) -> usize {
+    type Key = usize;
+
+    fn key(&self) -> Self::Key {
         self.num_taken
     }
 }
@@ -128,7 +130,7 @@ impl Process for SticksProcess {
     type PerChild = SticksPerChild;
     type Update = SticksUpdate;
 
-    fn best<'a>(&self, _: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a {
+    fn best<'a>(&self, _: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<<Self::PerChild as PerChild>::Key> where Self::PerChild: 'a {
         edges.max_by_key(|per_child| per_child.uct.visits()).map(|per_child| per_child.key())
     }
 

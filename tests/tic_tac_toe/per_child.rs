@@ -8,8 +8,10 @@ pub struct TicTacToePerChild {
 }
 
 impl PerChild for TicTacToePerChild {
-    fn key(&self) -> usize {
-        self.vertex as usize
+    type Key = u32;
+
+    fn key(&self) -> Self::Key {
+        self.vertex as u32
     }
 }
 

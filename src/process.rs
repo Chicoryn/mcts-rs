@@ -1,10 +1,12 @@
 pub trait PerChild {
-    fn key(&self) -> usize;
+    type Key: Copy + Ord;
+
+    fn key(&self) -> Self::Key;
 }
 
 pub enum SelectResult<P: PerChild> {
     Add(P),
-    Existing(usize),
+    Existing(P::Key),
     None
 }
 
@@ -21,7 +23,7 @@ pub trait Process {
     /// * `state` -
     /// * `edges` - all explored edges for the given `state`.
     ///
-    fn best<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a;
+    fn best<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> Option<<Self::PerChild as PerChild>::Key> where Self::PerChild: 'a;
 
     /// Returns the edge to be explored during search for a given `state` and
     /// set of already evaluated `edges`. If `None` is returned then this is
@@ -50,19 +52,21 @@ pub trait Process {
 #[cfg(test)]
 #[derive(Clone)]
 pub struct FakePerChild {
-    key: usize
+    key: u32
 }
 
 #[cfg(test)]
 impl FakePerChild {
-    pub fn new(key: usize) -> Self {
+    pub fn new(key: u32) -> Self {
         Self { key }
     }
 }
 
 #[cfg(test)]
 impl PerChild for FakePerChild {
-    fn key(&self) -> usize {
+    type Key = u32;
+
+    fn key(&self) -> Self::Key {
         self.key
     }
 }
@@ -76,7 +80,7 @@ impl Process for FakeProcess {
     type PerChild = FakePerChild;
     type Update = ();
 
-    fn best<'a>(&self, _: &Self::State, _: impl Iterator<Item=&'a Self::PerChild>) -> Option<usize> where Self::PerChild: 'a {
+    fn best<'a>(&self, _: &Self::State, _: impl Iterator<Item=&'a Self::PerChild>) -> Option<<Self::PerChild as PerChild>::Key> where Self::PerChild: 'a {
         Some(0)
     }
 
