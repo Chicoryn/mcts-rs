@@ -82,7 +82,7 @@ impl SticksState {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct SticksPerChild {
     uct: uct::PerChild,
     num_taken: usize

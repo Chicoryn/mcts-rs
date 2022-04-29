@@ -8,8 +8,13 @@ license = "MIT OR Apache-2.0"
 name = "sticks"
 harness = false
 
+[[bench]]
+name = "goban"
+harness = false
+
 [dev-dependencies]
 criterion = "0.3"
+goban = "0.17"
 rand = "0.8"
 
 [dependencies]
