@@ -1,11 +1,13 @@
 use rand::{
     prelude::{SliceRandom, StdRng},
-    Rng, SeedableRng
+    Rng, SeedableRng, thread_rng
 };
 use std::{
     cell::RefCell,
+    ops::{DerefMut, Deref},
     rc::Rc,
-    ops::DerefMut
+    sync::{Arc, Barrier},
+    thread,
 };
 use smallvec::SmallVec;
 use mcts_rs::{
@@ -121,8 +123,12 @@ impl SticksUpdate {
     }
 }
 
-pub struct SticksProcess {
-    rng: Rc<RefCell<StdRng>>
+pub struct SticksProcess;
+
+impl SticksProcess {
+    fn new() -> Self {
+        Self { }
+    }
 }
 
 impl Process for SticksProcess {
@@ -145,12 +151,12 @@ impl Process for SticksProcess {
             if unexplored_moves.is_empty() || best_edge.uct.uct(&state.uct) > state.uct.baseline() {
                 SelectResult::Existing(best_edge.key())
             } else {
-                unexplored_moves.choose(self.rng.borrow_mut().deref_mut()).map(|&n| Self::PerChild::new(n))
+                unexplored_moves.choose(&mut thread_rng()).map(|&n| Self::PerChild::new(n))
                     .map(|per_child| SelectResult::Add(per_child))
                     .unwrap_or(SelectResult::None)
             }
         } else {
-            unexplored_moves.choose(self.rng.borrow_mut().deref_mut()).map(|&n| Self::PerChild::new(n))
+            unexplored_moves.choose(&mut thread_rng()).map(|&n| Self::PerChild::new(n))
                 .map(|per_child| SelectResult::Add(per_child))
                 .unwrap_or(SelectResult::None)
         }
@@ -174,14 +180,10 @@ fn is_expandable(trace: &Trace<'_, SticksProcess>) -> bool {
     trace.steps().last().map(|s| s.map(|_, per_child| per_child.uct.visits() > 8)).unwrap_or(false)
 }
 
-pub fn search(n: usize) -> Mcts<SticksProcess> {
+fn inner_search(search_tree: &Mcts<SticksProcess>, limit: usize, _: usize) {
     let rng = Rc::new(RefCell::new(StdRng::seed_from_u64(0xdeadbeef)));
-    let search_tree = Mcts::new(
-        SticksProcess { rng: rng.clone() },
-        SticksState::new(1, Sticks::new())
-    );
 
-    while search_tree.root().uct.visits() < n {
+    while search_tree.root().uct.visits() < limit {
         match search_tree.probe() {
             (trace, _) if !trace.is_empty() && is_expandable(&trace) => {
                 let new_state = {
@@ -207,6 +209,31 @@ pub fn search(n: usize) -> Mcts<SticksProcess> {
             _ => { panic!() }
         }
     }
+}
 
-    search_tree
+pub fn search(num_threads: usize, limit: usize) -> Mcts<SticksProcess> {
+    let barrier = Arc::new(Barrier::new(num_threads));
+    let search_tree = Arc::new(Mcts::new(
+        SticksProcess::new(),
+        SticksState::new(1, Sticks::new())
+    ));
+
+    let handles = (0..num_threads - 1).map(|thread_id| {
+        let barrier = barrier.clone();
+        let search_tree = search_tree.clone();
+
+        thread::spawn(move || {
+            barrier.wait();
+            inner_search(search_tree.deref(), limit, thread_id);
+        })
+    }).collect::<Vec<_>>();
+
+    barrier.wait();
+    inner_search(search_tree.deref(), limit, num_threads - 1);
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    Arc::try_unwrap(search_tree).map_err(|_| ()).unwrap()
 }
