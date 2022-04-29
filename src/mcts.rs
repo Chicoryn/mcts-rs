@@ -1,11 +1,11 @@
 use slab::Slab;
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableReadGuard};
 use smallvec::SmallVec;
 
 use crate::{
     node::*,
     step::Step,
-    Process, Trace, ProbeStatus
+    Process, Trace, ProbeStatus, SelectResult
 };
 
 pub struct Mcts<P: Process> {
@@ -59,23 +59,31 @@ impl<P: Process> Mcts<P> {
 
     /// Returns a trace
     pub fn probe<'a>(&'a self) -> (Trace<'a, P>, ProbeStatus) {
-        let slab = self.slab.read();
+        let slab = self.slab.upgradable_read();
         let mut steps = SmallVec::new();
         let mut curr = self.root;
 
         loop {
             match slab[curr].select(&self.process) {
-                Some((next_key, ProbeStatus::Existing(next_ptr))) => {
-                    steps.push(Step::new(self, curr, next_key));
-                    curr = next_ptr;
-                },
-                Some((next_key, status)) => {
+                SelectResult::Add(per_child) => {
+                    let node_mut = &mut RwLockUpgradableReadGuard::upgrade(slab)[curr];
+                    let (next_key, status) = node_mut.try_expand(per_child);
                     steps.push(Step::new(self, curr, next_key));
 
-                    return (Trace::new(steps), status);
+                    return (Trace::new(steps), status)
                 },
-                None => { return (Trace::new(steps), ProbeStatus::Empty) }
-            };
+                SelectResult::Existing(next_key) => {
+                    let edge = slab[curr].edge(next_key);
+                    steps.push(Step::new(self, curr, next_key));
+
+                    if edge.is_valid() {
+                        curr = edge.ptr();
+                    } else {
+                        return (Trace::new(steps), ProbeStatus::Busy);
+                    }
+                },
+                SelectResult::None => { return (Trace::new(steps), ProbeStatus::Empty) }
+            }
         }
     }
 
@@ -84,7 +92,7 @@ impl<P: Process> Mcts<P> {
 
         if let Some(last_step) = trace.steps().last() {
             let new_child = slab.insert(Node::new(new_state));
-            let mut edge = slab[last_step.ptr].edge_mut(last_step.key);
+            let edge = slab[last_step.ptr].edge_mut(last_step.key);
 
             if !edge.try_insert(new_child) {
                 drop(edge);

@@ -53,11 +53,6 @@ impl<P: Process> Edge<P> {
     pub fn per_child(&self) -> &P::PerChild {
         &self.per_child
     }
-
-    /// Returns a mutable reference to the `per_child` of this edge.
-    pub fn per_child_mut(&mut self) -> &mut P::PerChild {
-        &mut self.per_child
-    }
 }
 
 #[cfg(test)]
