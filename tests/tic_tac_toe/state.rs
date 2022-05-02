@@ -52,10 +52,6 @@ impl TicTacToeState {
         self.uct.visits() as usize
     }
 
-    pub fn uct(&self) -> &uct::State {
-        &self.uct
-    }
-
     pub fn update(&self, _: &TicTacToeUpdate) {
         self.uct.update()
     }

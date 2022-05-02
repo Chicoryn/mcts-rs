@@ -148,13 +148,14 @@ impl Process for SticksProcess {
 
     fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
         let mut unexplored_moves = state.sticks.valid();
+        let total_visits = state.uct.visits();
         let best_edge = edges.max_by_key(|per_child| {
             unexplored_moves.retain(|&mut n| n != per_child.num_taken);
-            quantify(per_child.uct.uct(&state.uct))
+            quantify(per_child.uct.uct(total_visits))
         });
 
         if let Some(best_edge) = best_edge {
-            if unexplored_moves.is_empty() || best_edge.uct.uct(&state.uct) > state.uct.baseline() {
+            if unexplored_moves.is_empty() || best_edge.uct.uct(total_visits) > state.uct.baseline() {
                 SelectResult::Existing(best_edge.key())
             } else {
                 unexplored_moves.choose(&mut thread_rng()).map(|&n| Self::PerChild::new(n))

@@ -20,9 +20,10 @@ impl Process for TicTacToeProcess {
 
     fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
         let mut occupied = [false; 9];
+        let total_visits = state.visits() as u32;
         let best_edge = edges.max_by_key(|edge| {
             occupied[edge.vertex()] = true;
-            edge.uct(state)
+            edge.uct(total_visits)
         });
         let zero_edge = (0..9)
             .filter(|&vertex| !occupied[vertex] && state.is_valid(vertex))
@@ -34,7 +35,7 @@ impl Process for TicTacToeProcess {
             (None, Some(zero)) => SelectResult::Add(zero),
             (Some(best), None) => SelectResult::Existing(best.key()),
             (Some(best), Some(zero)) => {
-                if zero.uct(&state) > best.uct(&state) {
+                if zero.uct(total_visits) > best.uct(total_visits) {
                     SelectResult::Add(zero)
                 } else {
                     SelectResult::Existing(best.key())

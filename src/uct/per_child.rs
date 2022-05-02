@@ -1,9 +1,5 @@
 use std::sync::atomic::{Ordering, AtomicU32};
-
-use super::{
-    state::State,
-    update::Update
-};
+use super::update::Update;
 
 pub struct PerChild {
     total_value: AtomicU32,
@@ -59,8 +55,9 @@ impl PerChild {
         }
     }
 
-    pub fn uct(&self, state: &State) -> f32 {
-        let ln_n = (state.visits() as f32).ln();
+    #[inline(always)]
+    pub fn uct(&self, total_visits: u32) -> f32 {
+        let ln_n = (total_visits as f32).ln();
 
         self.win_rate() + (2.0f32 * ln_n / (self.visits() + 1) as f32).sqrt()
     }

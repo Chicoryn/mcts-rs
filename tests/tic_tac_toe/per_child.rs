@@ -39,8 +39,9 @@ impl TicTacToePerChild {
         (u16::MAX as f32 * x) as u32
     }
 
-    pub fn uct(&self, state: &TicTacToeState) -> u32 {
-        Self::quantify(self.uct.uct(state.uct()))
+    #[inline(always)]
+    pub fn uct(&self, total_visits: u32) -> u32 {
+        Self::quantify(self.uct.uct(total_visits))
     }
 
     pub fn visits(&self) -> u32 {

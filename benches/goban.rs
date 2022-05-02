@@ -129,8 +129,10 @@ impl Process for GobanProcess {
     fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild>
         where Self::PerChild: 'a
     {
-        if let Some(best_edge) = edges.max_by_key(|edge| (255.0 * edge.uct.uct(&state.uct)) as u32) {
-            if best_edge.uct.uct(&state.uct) < state.uct.baseline() {
+        let total_visits = state.uct.visits();
+
+        if let Some(best_edge) = edges.max_by_key(|edge| (255.0 * edge.uct.uct(total_visits)) as u32) {
+            if best_edge.uct.uct(total_visits) < state.uct.baseline() {
                 match state.choose().map(|point| Self::PerChild::new(point)) {
                     Some(new_edge) => SelectResult::Add(new_edge),
                     None => SelectResult::Existing(best_edge.key())
