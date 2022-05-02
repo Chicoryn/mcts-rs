@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicUsize, Ordering, AtomicU32};
+use std::sync::atomic::{Ordering, AtomicU32};
 
 use super::{
     state::State,
@@ -7,14 +7,14 @@ use super::{
 
 pub struct PerChild {
     total_value: AtomicU32,
-    visits: AtomicUsize
+    visits: AtomicU32
 }
 
 impl Clone for PerChild {
     fn clone(&self) -> Self {
         Self {
             total_value: AtomicU32::new(self.total_value.load(Ordering::Relaxed)),
-            visits: AtomicUsize::new(self.visits())
+            visits: AtomicU32::new(self.visits())
         }
     }
 }
@@ -30,7 +30,7 @@ impl PerChild {
     pub fn new() -> Self {
         Self {
             total_value: AtomicU32::new(0),
-            visits: AtomicUsize::new(0)
+            visits: AtomicU32::new(0)
         }
     }
 
@@ -45,7 +45,7 @@ impl PerChild {
         f32::from_bits(self.total_value.load(Ordering::Relaxed))
     }
 
-    pub fn visits(&self) -> usize {
+    pub fn visits(&self) -> u32 {
         self.visits.load(Ordering::Relaxed)
     }
 

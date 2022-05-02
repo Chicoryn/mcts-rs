@@ -43,7 +43,7 @@ impl TicTacToePerChild {
         Self::quantify(self.uct.uct(state.uct()))
     }
 
-    pub fn visits(&self) -> usize {
+    pub fn visits(&self) -> u32 {
         self.uct.visits()
     }
 }

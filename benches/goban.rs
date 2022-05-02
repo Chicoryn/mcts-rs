@@ -1,32 +1,14 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use goban::{pieces::{stones::Stone, util::coord::Point}, rules::{game::Game, Move, Player, EndGame, CHINESE}};
-use mcts_rs::{PerChild, State, Process, SelectResult, Mcts};
+use mcts_rs::{uct, PerChild, State, Process, SelectResult, Mcts};
 use rand::{thread_rng, prelude::*};
-use std::{sync::{atomic::{AtomicU64, AtomicU32, Ordering}, Arc, Barrier}, thread};
+use std::{sync::{Arc, Barrier}, thread};
 
 const MAX_GAME_LENGTH: usize = 162;
 
-fn isqrt(s: u64) -> u64 {
-    let mut x0 = s / 2;
-
-    if x0 != 0 {
-        let mut x1 = (x0 + s / x0) / 2;
-
-        while x1 < x0 {
-            x0 = x1;
-            x1 = (x0 + s / x0) / 2;
-        }
-
-        x0
-    } else {
-        s
-    }
-}
-
 struct GobanEdge {
     point: Point,
-    total_value: AtomicU64,
-    visits: AtomicU32,
+    uct: uct::PerChild,
 }
 
 impl PerChild for GobanEdge {
@@ -39,42 +21,17 @@ impl PerChild for GobanEdge {
 
 impl GobanEdge {
     fn new(point: Point) -> Self {
-        let total_value = AtomicU64::new(0);
-        let visits = AtomicU32::new(0);
-
-        Self { point, total_value, visits }
+        Self { point, uct: uct::PerChild::new() }
     }
 
     fn visits(&self) -> u32 {
-        self.visits.load(Ordering::Relaxed)
+        self.uct.visits()
     }
-
-    fn value(&self) -> u64 {
-        let visits = self.visits() as u64;
-
-        if visits == 0 {
-            0
-        } else {
-            self.total_value.load(Ordering::Relaxed) / visits
-        }
-    }
-
-    fn uct(&self, total_visits: u32) -> u64 {
-        let ln_n = u32::MAX as u64 * (32 - total_visits.leading_zeros()) as u64;
-
-        self.value() + isqrt(2 * ln_n / (self.visits() as u64 + 1))
-    }
-}
-
-fn uct_baseline(total_visits: u32) -> u64 {
-    let ln_n = u32::MAX as u64 * (32 - total_visits.leading_zeros()) as u64;
-
-    isqrt(2 * ln_n)
 }
 
 struct GobanState {
-    total_visits: AtomicU32,
-    goban: Game
+    goban: Game,
+    uct: uct::State
 }
 
 impl State for GobanState {
@@ -91,21 +48,18 @@ impl State for GobanState {
 
 impl GobanState {
     fn new(goban: Game) -> Self {
-        let total_visits = AtomicU32::new(0);
-
-        Self { total_visits, goban }
+        Self { goban, uct: uct::State::new() }
     }
 
     fn forward(&self, edge: &GobanEdge) -> Self {
-        let total_visits = AtomicU32::new(0);
         let mut goban = self.goban.clone();
         goban.play(Move::Play(edge.point.0, edge.point.1));
 
-        Self { total_visits, goban }
+        Self { goban, uct: uct::State::new() }
     }
 
     fn total_visits(&self) -> u32 {
-        self.total_visits.load(Ordering::Relaxed)
+        self.uct.visits()
     }
 
     fn turn(&self) -> Player {
@@ -120,7 +74,7 @@ impl GobanState {
             .choose(&mut thread_rng())
     }
 
-    fn evaluate(&self) -> u16 {
+    fn evaluate(&self) -> f32 {
         let mut count = 0;
         let mut goban = self.goban.clone();
 
@@ -135,24 +89,21 @@ impl GobanState {
         }
 
         match goban.outcome() {
-            Some(EndGame::WinnerByScore(winner, _)) => u16::MAX * (winner == self.turn()) as u16,
-            Some(EndGame::WinnerByResign(winner)) => u16::MAX * (winner == self.turn()) as u16,
-            _ => u16::MAX / 2,
+            Some(EndGame::WinnerByScore(winner, _)) => (winner == self.turn()) as i32 as f32,
+            Some(EndGame::WinnerByResign(winner)) => (winner == self.turn()) as i32 as f32,
+            _ => 0.5,
         }
     }
 }
 
 struct GobanUpdate {
     player: Player,
-
-    /// Quantized value where `u16::MAX` represents a win for `color`, and `0`
-    /// represents a loss.
-    value: u16,
+    uct: uct::Update
 }
 
 impl GobanUpdate {
-    fn new(player: Player, value: u16) -> Self {
-        Self { player, value }
+    fn new(player: Player, value: f32) -> Self {
+        Self { player, uct: uct::Update::new(value) }
     }
 }
 
@@ -178,10 +129,8 @@ impl Process for GobanProcess {
     fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild>
         where Self::PerChild: 'a
     {
-        let total_visits = state.total_visits();
-
-        if let Some(best_edge) = edges.max_by_key(|edge| edge.uct(total_visits)) {
-            if best_edge.uct(total_visits) < uct_baseline(total_visits) {
+        if let Some(best_edge) = edges.max_by_key(|edge| (255.0 * edge.uct.uct(&state.uct)) as u32) {
+            if best_edge.uct.uct(&state.uct) < state.uct.baseline() {
                 match state.choose().map(|point| Self::PerChild::new(point)) {
                     Some(new_edge) => SelectResult::Add(new_edge),
                     None => SelectResult::Existing(best_edge.key())
@@ -198,12 +147,10 @@ impl Process for GobanProcess {
     }
 
     fn update(&self, state: &Self::State, per_child: &Self::PerChild, update: &Self::Update, _: bool) {
-        state.total_visits.fetch_add(1, Ordering::AcqRel);
-        per_child.visits.fetch_add(1, Ordering::AcqRel);
-        per_child.total_value.fetch_add(
-            if update.player == state.turn() { update.value as u64 } else { (u16::MAX - update.value) as u64 },
-            Ordering::AcqRel
-        );
+        state.uct.update();
+        per_child.uct.update(&uct::Update::new(
+            if update.player == state.turn() { update.uct.value() } else { 1.0 - update.uct.value() }
+        ));
     }
 }
 

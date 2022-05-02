@@ -1,17 +1,17 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct State {
-    visits: AtomicUsize
+    visits: AtomicU32
 }
 
 impl State {
     pub fn new() -> Self {
         Self {
-            visits: AtomicUsize::new(0)
+            visits: AtomicU32::new(0)
         }
     }
 
-    pub fn visits(&self) -> usize {
+    pub fn visits(&self) -> u32 {
         self.visits.load(Ordering::Relaxed)
     }
 

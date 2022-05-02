@@ -182,7 +182,7 @@ fn quantify(x: f32) -> u64 {
     (u16::MAX as f32 * x) as u64
 }
 
-fn inner_search(search_tree: &Mcts<SticksProcess>, limit: usize, _: usize) {
+fn inner_search(search_tree: &Mcts<SticksProcess>, limit: u32, _: usize) {
     while search_tree.root().uct.visits() < limit {
         match search_tree.probe() {
             (trace, _) if trace.is_empty() => { panic!() },
@@ -205,7 +205,7 @@ fn inner_search(search_tree: &Mcts<SticksProcess>, limit: usize, _: usize) {
     }
 }
 
-pub fn search(num_threads: usize, limit: usize) -> Mcts<SticksProcess> {
+pub fn search(num_threads: usize, limit: u32) -> Mcts<SticksProcess> {
     let barrier = Arc::new(Barrier::new(num_threads));
     let search_tree = Arc::new(Mcts::new(
         SticksProcess::new(),

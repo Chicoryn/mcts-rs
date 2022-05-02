@@ -49,7 +49,7 @@ impl TicTacToeState {
     }
 
     pub fn visits(&self) -> usize {
-        self.uct.visits()
+        self.uct.visits() as usize
     }
 
     pub fn uct(&self) -> &uct::State {
