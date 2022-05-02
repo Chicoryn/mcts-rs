@@ -1,6 +1,5 @@
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableReadGuard, Mutex};
 use slab::Slab;
-use smallvec::SmallVec;
 use std::collections::HashMap;
 
 use crate::{
@@ -50,14 +49,14 @@ impl<P: Process> Mcts<P> {
 
     /// Returns the _best_ sequence of nodes and edges through this search
     /// tree.
-    pub fn path<'a>(&'a self) -> PathIter<P> {
+    pub fn path<'a>(&'a self) -> impl Iterator<Item=Step<'a, P>> {
         PathIter::new(self)
     }
 
     /// Returns a trace
     pub fn probe<'a>(&'a self) -> (Trace<'a, P>, ProbeStatus) {
         let slab = self.slab.upgradable_read();
-        let mut steps = SmallVec::new();
+        let mut steps = Vec::new();
         let mut curr = self.root;
 
         loop {

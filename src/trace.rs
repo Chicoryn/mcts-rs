@@ -1,17 +1,15 @@
-use smallvec::SmallVec;
-
 use crate::{
     process::Process,
     step::Step,
 };
 
 pub struct Trace<'a, P: Process> {
-    steps: SmallVec<[Step<'a, P>; 8]>
+    steps: Vec<Step<'a, P>>
 }
 
 impl<'a, P: Process> Trace<'a, P> {
     /// Returns a new trace with the given `steps` and `status`.
-    pub fn new(steps: SmallVec<[Step<'a, P>; 8]>) -> Self {
+    pub fn new(steps: Vec<Step<'a, P>>) -> Self {
         Self { steps }
     }
 
@@ -28,12 +26,11 @@ impl<'a, P: Process> Trace<'a, P> {
 
 #[cfg(test)]
 mod tests {
-    use smallvec::smallvec;
     use crate::FakeProcess;
     use super::*;
 
     #[test]
     fn check_empty() {
-        assert!(Trace::<FakeProcess>::new(smallvec! []).is_empty());
+        assert!(Trace::<FakeProcess>::new(vec! []).is_empty());
     }
 }

@@ -9,7 +9,6 @@ mod trace;
 pub mod uct;
 
 pub use self::mcts::*;
-pub use self::path_iter::*;
 pub use self::probe_status::*;
 pub use self::process::*;
 pub use self::step::*;
