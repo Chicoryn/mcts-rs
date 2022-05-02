@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use crate::{
     node::*,
     step::Step,
+    path_iter::PathIter,
     State, Process, Trace, ProbeStatus, SelectResult
 };
 
@@ -49,22 +50,8 @@ impl<P: Process> Mcts<P> {
 
     /// Returns the _best_ sequence of nodes and edges through this search
     /// tree.
-    pub fn path<'a>(&'a self) -> Trace<'a, P> {
-        let slab = self.slab.read();
-        let mut steps = SmallVec::new();
-        let mut curr = self.root;
-
-        while let Some((key, edge)) = slab[curr].best(&self.process) {
-            steps.push(Step::new(self, curr, key));
-
-            if !edge.is_valid() {
-                break
-            }
-
-            curr = edge.ptr();
-        }
-
-        Trace::new(steps)
+    pub fn path<'a>(&'a self) -> PathIter<P> {
+        PathIter::new(self)
     }
 
     /// Returns a trace

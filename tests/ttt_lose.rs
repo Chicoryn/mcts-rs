@@ -22,7 +22,7 @@ fn x_lose() {
         tic_tac_toe::TicTacToeProcess::new(),
         tic_tac_toe::TicTacToeState::new(board, 1),
         |mcts| {
-            if let Some(step) = mcts.path().steps().first() {
+            if let Some(step) = mcts.path().next() {
                 step.map(|_, per_child| {
                     per_child.value() <= 0.02
                 })
@@ -55,7 +55,7 @@ fn o_lose() {
         tic_tac_toe::TicTacToeProcess::new(),
         tic_tac_toe::TicTacToeState::new(board, -1),
         |mcts| {
-            if let Some(step) = mcts.path().steps().first() {
+            if let Some(step) = mcts.path().next() {
                 step.map(|_, per_child| {
                     per_child.value() <= 0.02
                 })
