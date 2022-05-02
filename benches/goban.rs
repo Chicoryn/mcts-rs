@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use goban::{pieces::{stones::Stone, util::coord::Point}, rules::{game::Game, Move, Player, EndGame, CHINESE}};
-use mcts_rs::{PerChild, Process, SelectResult, Mcts};
+use mcts_rs::{PerChild, State, Process, SelectResult, Mcts};
 use rand::{thread_rng, prelude::*};
 use std::{sync::{atomic::{AtomicU64, AtomicU32, Ordering}, Arc, Barrier}, thread};
 
@@ -75,6 +75,18 @@ fn uct_baseline(total_visits: u32) -> u64 {
 struct GobanState {
     total_visits: AtomicU32,
     goban: Game
+}
+
+impl State for GobanState {
+    fn hash(&self) -> Option<u64> {
+        let hash = *self.goban.last_hash();
+
+        if hash == 0 {
+            None
+        } else {
+            Some(hash)
+        }
+    }
 }
 
 impl GobanState {

@@ -1,3 +1,7 @@
+pub trait State {
+    fn hash(&self) -> Option<u64>;
+}
+
 pub trait PerChild {
     type Key: Copy + Ord;
 
@@ -11,7 +15,7 @@ pub enum SelectResult<P: PerChild> {
 }
 
 pub trait Process {
-    type State;
+    type State: State;
     type PerChild: PerChild;
     type Update;
 
@@ -51,6 +55,17 @@ pub trait Process {
 
 #[cfg(test)]
 #[derive(Clone)]
+pub struct FakeState;
+
+#[cfg(test)]
+impl State for FakeState {
+    fn hash(&self) -> Option<u64> {
+        None
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone)]
 pub struct FakePerChild {
     key: u32
 }
@@ -76,7 +91,7 @@ pub struct FakeProcess;
 
 #[cfg(test)]
 impl Process for FakeProcess {
-    type State = ();
+    type State = FakeState;
     type PerChild = FakePerChild;
     type Update = ();
 

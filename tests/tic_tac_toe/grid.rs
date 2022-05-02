@@ -1,4 +1,4 @@
-use std::fmt::{self, Debug, Display, Formatter};
+use std::{fmt::{self, Debug, Display, Formatter}, collections::hash_map::DefaultHasher, hash::Hasher};
 
 #[derive(Clone, Copy, Debug)]
 pub struct TicTacToe {
@@ -20,6 +20,16 @@ impl TicTacToe {
         Self {
             board: [0; 9]
         }
+    }
+
+    pub fn hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+
+        for vertex in &self.board {
+            hasher.write_i8(*vertex);
+        }
+
+        hasher.finish()
     }
 
     fn check_won(&self, vertices: [usize; 3], turn: i8) -> bool {

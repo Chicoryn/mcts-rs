@@ -1,17 +1,19 @@
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableReadGuard};
+use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableReadGuard, Mutex};
 use slab::Slab;
 use smallvec::SmallVec;
+use std::collections::HashMap;
 
 use crate::{
     node::*,
     step::Step,
-    Process, Trace, ProbeStatus, SelectResult
+    State, Process, Trace, ProbeStatus, SelectResult
 };
 
 pub struct Mcts<P: Process> {
     pub(super) root: usize,
     pub(super) process: P,
-    pub(super) slab: RwLock<Slab<Node<P>>>
+    pub(super) slab: RwLock<Slab<Node<P>>>,
+    pub(super) transpositions: Mutex<HashMap<u64, usize>>
 }
 
 impl<P: Process> Mcts<P> {
@@ -25,9 +27,19 @@ impl<P: Process> Mcts<P> {
     ///
     pub fn new(process: P, state: P::State) -> Self {
         let mut slab = Slab::new();
+        let root_hash = state.hash();
         let root = slab.insert(Node::new(state));
+        let mut transpositions = HashMap::with_capacity(32);
 
-        Self { root, process, slab: RwLock::new(slab) }
+        if let Some(hash) = root_hash {
+            transpositions.insert(hash, root);
+        }
+
+        Self { root, process, slab: RwLock::new(slab), transpositions: Mutex::new(transpositions) }
+    }
+
+    pub fn len(&self) -> usize {
+        self.transpositions.lock().len()
     }
 
     /// Returns the root node of this search tree.
@@ -89,12 +101,24 @@ impl<P: Process> Mcts<P> {
         let mut slab = self.slab.write();
 
         if let Some(last_step) = trace.steps().last() {
-            let new_child = slab.insert(Node::new(new_state));
-            let edge = slab[last_step.ptr].edge_mut(last_step.key);
+            let new_hash = new_state.hash();
+            let mut transpositions = self.transpositions.lock();
+            let transposed_child = new_hash.and_then(|hash| transpositions.get(&hash).cloned());
 
-            if !edge.try_insert(new_child) {
-                drop(edge);
-                slab.remove(new_child);
+            if let Some(transposed_child) = transposed_child {
+                let edge = slab[last_step.ptr].edge_mut(last_step.key);
+                edge.try_insert(transposed_child);
+            } else {
+                let new_child = slab.insert(Node::new(new_state));
+                if let Some(hash) = new_hash {
+                    transpositions.insert(hash, new_child);
+                }
+
+                let edge = slab[last_step.ptr].edge_mut(last_step.key);
+                if !edge.try_insert(new_child) {
+                    drop(edge);
+                    slab.remove(new_child);
+                }
             }
         }
 

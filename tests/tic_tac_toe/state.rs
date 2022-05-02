@@ -3,7 +3,7 @@ use rand::{
     Rng
 };
 use smallvec::SmallVec;
-use mcts_rs::uct;
+use mcts_rs::{uct, State};
 
 use super::{TicTacToe, TicTacToeUpdate};
 
@@ -11,6 +11,12 @@ pub struct TicTacToeState {
     board: TicTacToe,
     current_turn: i8,
     uct: uct::State
+}
+
+impl State for TicTacToeState {
+    fn hash(&self) -> Option<u64> {
+        Some(self.board.hash())
+    }
 }
 
 impl TicTacToeState {

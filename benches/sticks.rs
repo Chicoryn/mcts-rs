@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use mcts_rs::{uct, PerChild, Process, Mcts, SelectResult};
+use mcts_rs::{uct, PerChild, Process, Mcts, SelectResult, State};
 use rand::{prelude::SliceRandom, Rng, thread_rng};
 use smallvec::SmallVec;
-use std::{ops::Deref, sync::{Arc, Barrier}, thread};
+use std::{ops::Deref, sync::{Arc, Barrier}, thread, collections::hash_map::DefaultHasher, hash::Hasher};
 
 #[derive(Clone)]
 struct Sticks {
@@ -14,6 +14,10 @@ impl Sticks {
         Self {
             num_remaining: 7
         }
+    }
+
+    fn hash(&self) -> u64 {
+        self.num_remaining as u64
     }
 
     fn is_over(&self) -> bool {
@@ -55,6 +59,15 @@ pub struct SticksState {
     sticks: Sticks,
     uct: uct::State,
     side: i8
+}
+
+impl State for SticksState {
+    fn hash(&self) -> Option<u64> {
+        let mut hasher = DefaultHasher::new();
+        hasher.write_u64(self.sticks.hash());
+        hasher.write_i8(self.side);
+        Some(hasher.finish())
+    }
 }
 
 impl SticksState {
