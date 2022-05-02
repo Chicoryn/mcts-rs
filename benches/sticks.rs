@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mcts_rs::{uct, PerChild, Process, Mcts, SelectResult, State};
+use ordered_float::OrderedFloat;
 use rand::{prelude::SliceRandom, Rng, thread_rng};
 use smallvec::SmallVec;
 use std::{ops::Deref, sync::{Arc, Barrier}, thread, collections::hash_map::DefaultHasher, hash::Hasher};
@@ -151,7 +152,7 @@ impl Process for SticksProcess {
         let total_visits = state.uct.visits();
         let best_edge = edges.max_by_key(|per_child| {
             unexplored_moves.retain(|&mut n| n != per_child.num_taken);
-            quantify(per_child.uct.uct(total_visits))
+            OrderedFloat(per_child.uct.uct(total_visits))
         });
 
         if let Some(best_edge) = best_edge {
@@ -177,10 +178,6 @@ impl Process for SticksProcess {
             uct::Update::new(1.0 - update.uct.value())
         });
     }
-}
-
-fn quantify(x: f32) -> u64 {
-    (u16::MAX as f32 * x) as u64
 }
 
 fn inner_search(search_tree: &Mcts<SticksProcess>, limit: u32, _: usize) {

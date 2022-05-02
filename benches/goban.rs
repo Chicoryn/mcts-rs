@@ -1,6 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use goban::{pieces::{stones::Stone, util::coord::Point}, rules::{game::Game, Move, Player, EndGame, CHINESE}};
 use mcts_rs::{uct, PerChild, State, Process, SelectResult, Mcts};
+use ordered_float::OrderedFloat;
 use rand::{thread_rng, prelude::*};
 use std::{sync::{Arc, Barrier}, thread};
 
@@ -131,7 +132,7 @@ impl Process for GobanProcess {
     {
         let total_visits = state.uct.visits();
 
-        if let Some(best_edge) = edges.max_by_key(|edge| (255.0 * edge.uct.uct(total_visits)) as u32) {
+        if let Some(best_edge) = edges.max_by_key(|edge| OrderedFloat(edge.uct.uct(total_visits))) {
             if best_edge.uct.uct(total_visits) < state.uct.baseline() {
                 match state.choose().map(|point| Self::PerChild::new(point)) {
                     Some(new_edge) => SelectResult::Add(new_edge),
