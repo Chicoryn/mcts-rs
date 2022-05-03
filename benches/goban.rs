@@ -133,7 +133,7 @@ impl Process for GobanProcess {
         let total_visits = state.uct.visits();
 
         if let Some(best_edge) = edges.max_by_key(|edge| OrderedFloat(edge.uct.uct(total_visits))) {
-            if best_edge.uct.uct(total_visits) < state.uct.baseline() {
+            if best_edge.uct.uct(total_visits) < uct::State::baseline(total_visits) {
                 match state.choose().map(|point| Self::PerChild::new(point)) {
                     Some(new_edge) => SelectResult::Add(new_edge),
                     None => SelectResult::Existing(best_edge.key())

@@ -1,5 +1,6 @@
 use super::{TicTacToeState, TicTacToePerChild, TicTacToeUpdate};
-use mcts_rs::{PerChild, Process, SelectResult};
+use mcts_rs::{uct, PerChild, Process, SelectResult};
+use ordered_float::OrderedFloat;
 
 pub struct TicTacToeProcess;
 
@@ -21,26 +22,23 @@ impl Process for TicTacToeProcess {
     fn select<'a>(&self, state: &Self::State, edges: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
         let mut occupied = [false; 9];
         let total_visits = state.visits() as u32;
-        let best_edge = edges.max_by_key(|edge| {
+        let best_edge = edges.max_by_key(|&edge| {
             occupied[edge.vertex()] = true;
-            edge.uct(total_visits)
+            OrderedFloat(edge.uct(total_visits))
         });
-        let zero_edge = (0..9)
-            .filter(|&vertex| !occupied[vertex] && state.is_valid(vertex))
-            .next()
-            .map(|vertex| TicTacToePerChild::new(vertex));
 
-        match (best_edge, zero_edge) {
-            (None, None) => SelectResult::None,
-            (None, Some(zero)) => SelectResult::Add(zero),
-            (Some(best), None) => SelectResult::Existing(best.key()),
-            (Some(best), Some(zero)) => {
-                if zero.uct(total_visits) > best.uct(total_visits) {
-                    SelectResult::Add(zero)
-                } else {
-                    SelectResult::Existing(best.key())
-                }
+        if let Some(best_edge) = best_edge {
+            if best_edge.uct(total_visits) > uct::State::baseline(total_visits) {
+                SelectResult::Existing(best_edge.key())
+            } else {
+                (0..9).filter(|&i| !occupied[i] && state.is_valid(i)).next()
+                    .map(|i| SelectResult::Add(Self::PerChild::new(i)))
+                    .unwrap_or_else(|| SelectResult::Existing(best_edge.key()))
             }
+        } else {
+            (0..9).filter(|&i| !occupied[i] && state.is_valid(i)).next()
+                .map(|i| SelectResult::Add(Self::PerChild::new(i)))
+                .unwrap_or(SelectResult::None)
         }
     }
 

@@ -156,7 +156,7 @@ impl Process for SticksProcess {
         });
 
         if let Some(best_edge) = best_edge {
-            if unexplored_moves.is_empty() || best_edge.uct.uct(total_visits) > state.uct.baseline() {
+            if unexplored_moves.is_empty() || best_edge.uct.uct(total_visits) > uct::State::baseline(total_visits) {
                 SelectResult::Existing(best_edge.key())
             } else {
                 unexplored_moves.choose(&mut thread_rng()).map(|&n| Self::PerChild::new(n))

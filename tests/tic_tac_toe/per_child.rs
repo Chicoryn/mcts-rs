@@ -1,6 +1,5 @@
 use super::{TicTacToeState, TicTacToeUpdate};
 use mcts_rs::{uct, PerChild};
-use ordered_float::OrderedFloat;
 
 #[derive(Clone)]
 pub struct TicTacToePerChild {
@@ -37,8 +36,8 @@ impl TicTacToePerChild {
     }
 
     #[inline(always)]
-    pub fn uct(&self, total_visits: u32) -> OrderedFloat<f32> {
-        OrderedFloat(self.uct.uct(total_visits))
+    pub fn uct(&self, total_visits: u32) -> f32 {
+        self.uct.uct(total_visits)
     }
 
     pub fn visits(&self) -> u32 {

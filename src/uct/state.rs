@@ -19,7 +19,7 @@ impl State {
         self.visits.fetch_add(1, Ordering::AcqRel);
     }
 
-    pub fn baseline(&self) -> f32 {
-        (2.0 * (self.visits() as f32).ln()).sqrt()
+    pub fn baseline(total_visits: u32) -> f32 {
+        (2.0 * (total_visits as f32).ln()).sqrt()
     }
 }
