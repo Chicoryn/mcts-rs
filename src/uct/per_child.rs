@@ -31,23 +31,24 @@ impl PerChild {
     }
 
     pub fn update(&self, up: &Update) {
+        self.visits.fetch_add(1, Ordering::AcqRel);
         self.total_value.fetch_update(Ordering::AcqRel, Ordering::Acquire, |prev_value| {
             Some((f32::from_bits(prev_value) + up.value()).to_bits())
         }).unwrap();
-        self.visits.fetch_add(1, Ordering::AcqRel);
     }
 
+    #[inline(always)]
     fn total_value(&self) -> f32 {
         f32::from_bits(self.total_value.load(Ordering::Relaxed))
     }
 
+    #[inline(always)]
     pub fn visits(&self) -> u32 {
         self.visits.load(Ordering::Relaxed)
     }
 
-    pub fn win_rate(&self) -> f32 {
-        let visits = self.visits();
-
+    #[inline(always)]
+    pub fn win_rate(&self, visits: u32) -> f32 {
         if visits > 0 {
             self.total_value() / visits as f32
         } else {
@@ -58,7 +59,8 @@ impl PerChild {
     #[inline(always)]
     pub fn uct(&self, total_visits: u32) -> f32 {
         let ln_n = (total_visits as f32).ln();
+        let visits = self.visits();
 
-        self.win_rate() + (2.0f32 * ln_n / (self.visits() + 1) as f32).sqrt()
+        self.win_rate(visits) + (2.0f32 * ln_n / (visits + 1) as f32).sqrt()
     }
 }

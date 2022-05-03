@@ -25,7 +25,7 @@ impl TicTacToePerChild {
     }
 
     pub fn value(&self) -> f32 {
-        self.uct.win_rate()
+        self.uct.win_rate(self.visits())
     }
 
     pub fn vertex(&self) -> usize {
