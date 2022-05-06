@@ -1,7 +1,4 @@
-use rand::{
-    rngs::StdRng,
-    SeedableRng
-};
+use rand::{rngs::StdRng, SeedableRng};
 use mcts_rs::{Mcts, ProbeStatus};
 
 use super::*;
@@ -26,7 +23,7 @@ pub fn assert_search(
 
                     (
                         TicTacToeState::new(board, -state.turn()),
-                        !state.is_terminal() && state.visits() >= 8
+                        state.visits() >= 8 && !state.is_terminal()
                     )
                 });
                 let update = TicTacToeUpdate::new(
