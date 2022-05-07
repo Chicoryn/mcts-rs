@@ -1,4 +1,5 @@
 use crate::process::Process;
+use std::marker::PhantomData;
 
 /// Reserved value for the `ptr` field that indicates that this edge has not
 /// yet been expanded.
@@ -6,7 +7,8 @@ pub const EXPANDING: usize = usize::MAX;
 
 pub struct Edge<P: Process> {
     ptr: usize,
-    per_child: P::PerChild
+    per_child: usize,
+    _phantom: PhantomData<P>
 }
 
 impl<P: Process> Edge<P> {
@@ -16,9 +18,10 @@ impl<P: Process> Edge<P> {
     ///
     /// * `per_child` -
     ///
-    pub fn new(per_child: P::PerChild) -> Self {
+    pub fn new(per_child: usize) -> Self {
         Self {
             ptr: EXPANDING,
+            _phantom: PhantomData::default(),
             per_child
         }
     }
@@ -50,21 +53,19 @@ impl<P: Process> Edge<P> {
     }
 
     /// Returns a reference to the `per_child` of this edge.
-    pub fn per_child(&self) -> &P::PerChild {
-        &self.per_child
+    pub fn per_child(&self) -> usize {
+        self.per_child
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{PerChild, FakePerChild, FakeProcess};
+    use crate::FakeProcess;
     use super::*;
 
     #[test]
     fn check_valid() {
-        let mut edge = Edge::<FakeProcess>::new(
-            FakePerChild::new(37)
-        );
+        let mut edge = Edge::<FakeProcess>::new(1);
 
         assert_eq!(edge.is_valid(), false);
         assert_eq!(edge.try_insert(1), true);
@@ -74,9 +75,7 @@ mod tests {
 
     #[test]
     fn check_double_insert() {
-        let mut edge = Edge::<FakeProcess>::new(
-            FakePerChild::new(37)
-        );
+        let mut edge = Edge::<FakeProcess>::new(1);
 
         assert_eq!(edge.try_insert(1), true);
         assert_eq!(edge.try_insert(1), false);
@@ -84,10 +83,8 @@ mod tests {
 
     #[test]
     fn check_per_child() {
-        let edge = Edge::<FakeProcess>::new(
-            FakePerChild::new(1)
-        );
+        let edge = Edge::<FakeProcess>::new(1);
 
-        assert_eq!(edge.per_child().key(), 1);
+        assert_eq!(edge.per_child(), 1);
     }
 }

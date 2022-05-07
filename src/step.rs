@@ -22,6 +22,9 @@ impl<'a, P: Process> Step<'a, P> {
     /// * `f` - the mapper for this steps `state` and `per_child`
     ///
     pub fn map<T>(&self, f: impl FnOnce(&P::State, &P::PerChild) -> T) -> T {
-        self.search_tree.slab.read()[self.ptr].map(self.key, |state, edge| f(state, edge.per_child()))
+        let nodes = self.search_tree.nodes.read();
+        let per_childs = self.search_tree.per_childs.read();
+
+        nodes[self.ptr].map(&per_childs, self.key, |state, _, per_child| f(state, per_child))
     }
 }

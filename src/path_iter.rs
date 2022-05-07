@@ -17,10 +17,11 @@ impl<'a, P: Process> Iterator for PathIter<'a, P> {
     type Item = Step<'a, P>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let slab = self.search_tree.slab.read();
+        let nodes = self.search_tree.nodes.read();
+        let per_childs = self.search_tree.per_childs.read();
         let curr = self.current;
 
-        if let Some((key, edge)) = slab.get(curr).and_then(|node| node.best(&self.search_tree.process)) {
+        if let Some((key, edge)) = nodes.get(curr).and_then(|node| node.best(&self.search_tree.process, &per_childs)) {
             if edge.is_valid() {
                 self.current = edge.ptr();
             } else {
