@@ -1,3 +1,4 @@
+use crossbeam::epoch;
 use crate::{
     process::{PerChild, Process},
     mcts::Mcts,
@@ -24,7 +25,8 @@ impl<'a, P: Process> Step<'a, P> {
     pub fn map<T>(&self, f: impl FnOnce(&P::State, &P::PerChild) -> T) -> T {
         let nodes = self.search_tree.nodes.read();
         let per_childs = self.search_tree.per_childs.read();
+        let pin = epoch::pin();
 
-        nodes[self.ptr].map(&per_childs, self.key, |state, _, per_child| f(state, per_child))
+        nodes[self.ptr].map(&pin, &per_childs, self.key, |state, _, per_child| f(state, per_child))
     }
 }

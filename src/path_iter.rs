@@ -1,4 +1,5 @@
 use crate::{Mcts, process::Process, Step};
+use crossbeam::epoch;
 
 pub struct PathIter<'a, P: Process> {
     search_tree: &'a Mcts<P>,
@@ -19,9 +20,10 @@ impl<'a, P: Process> Iterator for PathIter<'a, P> {
     fn next(&mut self) -> Option<Self::Item> {
         let nodes = self.search_tree.nodes.read();
         let per_childs = self.search_tree.per_childs.read();
+        let pin = epoch::pin();
         let curr = self.current;
 
-        if let Some((key, edge)) = nodes.get(curr).and_then(|node| node.best(&self.search_tree.process, &per_childs)) {
+        if let Some((key, edge)) = nodes.get(curr).and_then(|node| node.best(&pin, &self.search_tree.process, &per_childs)) {
             if edge.is_valid() {
                 self.current = edge.ptr();
             } else {
