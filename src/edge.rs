@@ -11,6 +11,16 @@ pub struct Edge<P: Process> {
     _phantom: PhantomData<P>
 }
 
+impl<P: Process> Clone for Edge<P> {
+    fn clone(&self) -> Self {
+        Self {
+            ptr: self.ptr,
+            per_child: self.per_child,
+            _phantom: PhantomData::default(),
+        }
+    }
+}
+
 impl<P: Process> Edge<P> {
     /// Returns an unexpanded edge with the given `per_child`.
     ///

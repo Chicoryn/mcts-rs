@@ -1,4 +1,4 @@
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableReadGuard, Mutex};
+use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
 use slab::Slab;
 use std::collections::HashMap;
 
@@ -57,19 +57,21 @@ impl<P: Process> Mcts<P> {
 
     /// Returns a trace
     pub fn probe<'a>(&'a self) -> (Trace<'a, P>, ProbeStatus) {
-        let nodes = self.nodes.upgradable_read();
-        let per_childs = self.per_childs.upgradable_read();
+        let nodes = self.nodes.read();
+        let per_childs = self.per_childs.read();
         let mut steps = Vec::new();
         let mut curr = self.root;
 
         loop {
             match nodes[curr].select(&self.process, &per_childs) {
                 SelectResult::Add(per_child) => {
+                    drop(per_childs);
+
                     let next_key = per_child.key();
-                    let node_mut = &mut RwLockUpgradableReadGuard::upgrade(nodes)[curr];
-                    let mut per_childs_mut = RwLockUpgradableReadGuard::upgrade(per_childs);
+                    let node = &nodes[curr];
+                    let mut per_childs_mut = self.per_childs.write();
                     let per_child_idx = per_childs_mut.insert(per_child);
-                    node_mut.try_expand(&RwLockWriteGuard::downgrade(per_childs_mut), per_child_idx);
+                    node.try_expand(&RwLockWriteGuard::downgrade(per_childs_mut), per_child_idx);
                     steps.push(Step::new(self, curr, next_key));
 
                     return (Trace::new(steps), ProbeStatus::Expanded)
@@ -99,17 +101,14 @@ impl<P: Process> Mcts<P> {
             let transposed_child = new_hash.and_then(|hash| transpositions.get(&hash).cloned());
 
             if let Some(transposed_child) = transposed_child {
-                let edge = nodes[last_step.ptr].edge_mut(&per_childs, last_step.key);
-                edge.try_insert(transposed_child);
+                nodes[last_step.ptr].update(&per_childs, last_step.key, |edge_mut| edge_mut.try_insert(transposed_child));
             } else {
                 let new_child = nodes.insert(Node::new(new_state));
                 if let Some(hash) = new_hash {
                     transpositions.insert(hash, new_child);
                 }
 
-                let edge = nodes[last_step.ptr].edge_mut(&per_childs, last_step.key);
-                if !edge.try_insert(new_child) {
-                    drop(edge);
+                if !nodes[last_step.ptr].update(&per_childs, last_step.key, |edge_mut| edge_mut.try_insert(new_child)) {
                     nodes.remove(new_child);
                 }
             }

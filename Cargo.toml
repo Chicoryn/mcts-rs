@@ -19,6 +19,7 @@ ordered-float = "3.0"
 rand = "0.8"
 
 [dependencies]
+crossbeam = "0.8"
 parking_lot = "0.12"
 slab = "0.4"
 smallvec = "1.8"
