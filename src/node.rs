@@ -56,12 +56,18 @@ impl<P: Process> Node<P> {
 
     pub(super) fn try_expand(&self, per_childs: &Slab<P::PerChild>, per_child: usize) {
         let pin = epoch::pin();
-        let mut edges = unsafe { self.edges.load_consume(&pin).deref() }.clone();
 
-        edges.push(Edge::new(per_child));
-        edges.sort_unstable_by_key(|edge| per_childs[edge.per_child()].key());
+        loop {
+            let current = self.edges.load_consume(&pin);
+            let mut edges = unsafe { current.deref() }.clone();
 
-        self.edges.swap(Owned::new(edges), Ordering::AcqRel, &pin);
+            edges.push(Edge::new(per_child));
+            edges.sort_unstable_by_key(|edge| per_childs[edge.per_child()].key());
+
+            if self.edges.compare_exchange_weak(current, Owned::new(edges), Ordering::AcqRel, Ordering::Relaxed, &pin).is_ok() {
+                break
+            }
+        }
     }
 
     pub(super) fn select(&self, process: &P, per_childs: &Slab<P::PerChild>) -> SelectResult<P::PerChild> {
