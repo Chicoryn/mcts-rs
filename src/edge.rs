@@ -1,22 +1,27 @@
-use crate::process::Process;
-use std::marker::PhantomData;
+use std::ptr::NonNull;
+
+use crate::{process::Process, PerChild};
 
 /// Reserved value for the `ptr` field that indicates that this edge has not
 /// yet been expanded.
 pub const EXPANDING: usize = usize::MAX;
 
-pub struct Edge<P: Process> {
+struct EdgeBox<P: Process> {
     ptr: usize,
-    per_child: usize,
-    _phantom: PhantomData<P>
+    per_child: P::PerChild
 }
+
+pub struct Edge<P: Process> {
+    ptr: NonNull<EdgeBox<P>>
+}
+
+unsafe impl<P: Process> Send for Edge<P> {}
+unsafe impl<P: Process> Sync for Edge<P> {}
 
 impl<P: Process> Clone for Edge<P> {
     fn clone(&self) -> Self {
         Self {
-            ptr: self.ptr,
-            per_child: self.per_child,
-            _phantom: PhantomData::default(),
+            ptr: unsafe { NonNull::new_unchecked(self.ptr.as_ptr()) }
         }
     }
 }
@@ -28,22 +33,36 @@ impl<P: Process> Edge<P> {
     ///
     /// * `per_child` -
     ///
-    pub fn new(per_child: usize) -> Self {
+    pub fn new(per_child: P::PerChild) -> Self {
         Self {
-            ptr: EXPANDING,
-            _phantom: PhantomData::default(),
-            per_child
+            ptr: unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(EdgeBox {
+                ptr: EXPANDING,
+                per_child
+            }))) }
         }
+    }
+
+    pub fn drop(&mut self) {
+        unsafe { drop(Box::from_raw(self.ptr.as_ptr())) }
     }
 
     /// Returns the pointer to the destination node in the slab.
     pub fn ptr(&self) -> usize {
-        self.ptr
+        unsafe { self.ptr.as_ref().ptr }
+    }
+
+    /// Returns a reference to the `per_child` of this edge.
+    pub fn per_child(&self) -> &P::PerChild {
+        unsafe { &self.ptr.as_ref().per_child }
+    }
+
+    pub fn key(&self) -> <<P as Process>::PerChild as PerChild>::Key {
+        self.per_child().key()
     }
 
     /// Returns is this edge has a destination node.
     pub fn is_valid(&self) -> bool {
-        self.ptr != EXPANDING
+        self.ptr() != EXPANDING
     }
 
     /// Set the destination node of this edge to the given `new_ptr` if this
@@ -57,44 +76,8 @@ impl<P: Process> Edge<P> {
         if self.is_valid() {
             return false;
         } else {
-            self.ptr = new_ptr;
+            unsafe { self.ptr.as_mut().ptr = new_ptr }
             return true;
         }
-    }
-
-    /// Returns a reference to the `per_child` of this edge.
-    pub fn per_child(&self) -> usize {
-        self.per_child
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::FakeProcess;
-    use super::*;
-
-    #[test]
-    fn check_valid() {
-        let mut edge = Edge::<FakeProcess>::new(1);
-
-        assert_eq!(edge.is_valid(), false);
-        assert_eq!(edge.try_insert(1), true);
-        assert_eq!(edge.ptr(), 1);
-        assert_eq!(edge.is_valid(), true);
-    }
-
-    #[test]
-    fn check_double_insert() {
-        let mut edge = Edge::<FakeProcess>::new(1);
-
-        assert_eq!(edge.try_insert(1), true);
-        assert_eq!(edge.try_insert(1), false);
-    }
-
-    #[test]
-    fn check_per_child() {
-        let edge = Edge::<FakeProcess>::new(1);
-
-        assert_eq!(edge.per_child(), 1);
     }
 }
