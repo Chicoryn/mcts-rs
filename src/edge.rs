@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::{ptr::NonNull, sync::atomic::{AtomicUsize, Ordering}};
 
 use crate::{process::Process, PerChild};
 
@@ -7,7 +7,7 @@ use crate::{process::Process, PerChild};
 pub const EXPANDING: usize = usize::MAX;
 
 struct EdgeBox<P: Process> {
-    ptr: usize,
+    ptr: AtomicUsize,
     per_child: P::PerChild
 }
 
@@ -36,7 +36,7 @@ impl<P: Process> Edge<P> {
     pub fn new(per_child: P::PerChild) -> Self {
         Self {
             ptr: unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(EdgeBox {
-                ptr: EXPANDING,
+                ptr: AtomicUsize::new(EXPANDING),
                 per_child
             }))) }
         }
@@ -48,7 +48,7 @@ impl<P: Process> Edge<P> {
 
     /// Returns the pointer to the destination node in the slab.
     pub fn ptr(&self) -> usize {
-        unsafe { self.ptr.as_ref().ptr }
+        unsafe { self.ptr.as_ref().ptr.load(Ordering::Relaxed) }
     }
 
     /// Returns a reference to the `per_child` of this edge.
@@ -72,12 +72,9 @@ impl<P: Process> Edge<P> {
     ///
     /// * `new_ptr` -
     ///
-    pub fn try_insert(&mut self, new_ptr: usize) -> bool {
-        if self.is_valid() {
-            return false;
-        } else {
-            unsafe { self.ptr.as_mut().ptr = new_ptr }
-            return true;
-        }
+    pub fn try_insert(&self, new_ptr: usize) -> bool {
+        let ptr = unsafe { &self.ptr.as_ref().ptr };
+
+        ptr.compare_exchange_weak(EXPANDING, new_ptr, Ordering::AcqRel, Ordering::Relaxed) == Ok(EXPANDING)
     }
 }

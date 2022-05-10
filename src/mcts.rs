@@ -86,28 +86,37 @@ impl<P: Process> Mcts<P> {
     }
 
     fn insert<'g>(&self, trace: &Trace<'_, P>, new_state: P::State) -> RwLockReadGuard<Slab<Node<P>>> {
-        let mut nodes = self.nodes.write();
-
         if let Some(last_step) = trace.steps().last() {
             let new_hash = new_state.hash();
             let mut transpositions = self.transpositions.lock();
             let transposed_child = new_hash.and_then(|hash| transpositions.get(&hash).cloned());
 
             if let Some(transposed_child) = transposed_child {
-                nodes[last_step.ptr].update(last_step.pin(), last_step.key, |edge_mut| edge_mut.try_insert(transposed_child));
+                let nodes = self.nodes.read();
+                let edge = nodes[last_step.ptr].edge(last_step.pin(), last_step.key);
+                edge.try_insert(transposed_child);
+
+                nodes
             } else {
-                let new_child = nodes.insert(Node::new(new_state));
+                let new_child = self.nodes.write().insert(Node::new(new_state));
+                let nodes = self.nodes.read();
                 if let Some(hash) = new_hash {
                     transpositions.insert(hash, new_child);
                 }
 
-                if !nodes[last_step.ptr].update(last_step.pin(), last_step.key, |edge_mut| edge_mut.try_insert(new_child)) {
-                    nodes.remove(new_child);
+                if !nodes[last_step.ptr].edge(last_step.pin(), last_step.key).try_insert(new_child) {
+                    drop(nodes);
+
+                    let mut nodes_mut = self.nodes.write();
+                    nodes_mut.remove(new_child);
+                    RwLockWriteGuard::downgrade(nodes_mut)
+                } else {
+                    nodes
                 }
             }
+        } else {
+            self.nodes.read()
         }
-
-        RwLockWriteGuard::downgrade(nodes)
     }
 
     pub fn update(&self, trace: Trace<'_, P>, state: Option<P::State>, up: P::Update) {

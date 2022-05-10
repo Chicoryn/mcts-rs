@@ -52,15 +52,6 @@ impl<P: Process> Node<P> {
         }).unwrap()
     }
 
-    pub(super) fn update<'g, T>(&mut self, pin: &'g Guard, key: <<P as Process>::PerChild as PerChild>::Key, f: impl FnOnce(&mut Edge<P>) -> T) -> T {
-        let edges = unsafe { self.edges.load_consume(pin).deref_mut() };
-        let edge = edges.binary_search_by_key(&key, |edge| edge.key()).map(|i| {
-            &mut edges[i]
-        }).unwrap();
-
-        f(edge)
-    }
-
     pub(super) fn try_expand<'g>(&self, pin: &'g Guard, per_child: P::PerChild) {
         let edge = Edge::new(per_child);
 
