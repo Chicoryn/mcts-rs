@@ -1,4 +1,4 @@
-use std::{ptr::NonNull, sync::atomic::{AtomicUsize, Ordering}};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{process::Process, PerChild};
 
@@ -6,24 +6,9 @@ use crate::{process::Process, PerChild};
 /// yet been expanded.
 pub const EXPANDING: usize = usize::MAX;
 
-struct EdgeBox<P: Process> {
+pub struct Edge<P: Process> {
     ptr: AtomicUsize,
     per_child: P::PerChild
-}
-
-pub struct Edge<P: Process> {
-    ptr: NonNull<EdgeBox<P>>
-}
-
-unsafe impl<P: Process> Send for Edge<P> {}
-unsafe impl<P: Process> Sync for Edge<P> {}
-
-impl<P: Process> Clone for Edge<P> {
-    fn clone(&self) -> Self {
-        Self {
-            ptr: unsafe { NonNull::new_unchecked(self.ptr.as_ptr()) }
-        }
-    }
 }
 
 impl<P: Process> Edge<P> {
@@ -35,25 +20,19 @@ impl<P: Process> Edge<P> {
     ///
     pub fn new(per_child: P::PerChild) -> Self {
         Self {
-            ptr: unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(EdgeBox {
-                ptr: AtomicUsize::new(EXPANDING),
-                per_child
-            }))) }
+            ptr: AtomicUsize::new(EXPANDING),
+            per_child
         }
-    }
-
-    pub fn drop(&mut self) {
-        unsafe { drop(Box::from_raw(self.ptr.as_ptr())) }
     }
 
     /// Returns the pointer to the destination node in the slab.
     pub fn ptr(&self) -> usize {
-        unsafe { self.ptr.as_ref().ptr.load(Ordering::Relaxed) }
+        self.ptr.load(Ordering::Relaxed)
     }
 
     /// Returns a reference to the `per_child` of this edge.
     pub fn per_child(&self) -> &P::PerChild {
-        unsafe { &self.ptr.as_ref().per_child }
+        &self.per_child
     }
 
     pub fn key(&self) -> <<P as Process>::PerChild as PerChild>::Key {
@@ -73,8 +52,6 @@ impl<P: Process> Edge<P> {
     /// * `new_ptr` -
     ///
     pub fn try_insert(&self, new_ptr: usize) -> bool {
-        let ptr = unsafe { &self.ptr.as_ref().ptr };
-
-        ptr.compare_exchange_weak(EXPANDING, new_ptr, Ordering::AcqRel, Ordering::Relaxed) == Ok(EXPANDING)
+        self.ptr.compare_exchange_weak(EXPANDING, new_ptr, Ordering::AcqRel, Ordering::Relaxed) == Ok(EXPANDING)
     }
 }

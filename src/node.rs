@@ -5,11 +5,12 @@ use std::sync::atomic::Ordering;
 use crate::{
     edge::Edge,
     process::{PerChild, SelectResult, Process},
+    safe_nonnull::SafeNonNull
 };
 
 pub(super) struct Node<P: Process> {
     state: P::State,
-    edges: Atomic<SmallVec<[Edge<P>; 8]>>
+    edges: Atomic<SmallVec<[SafeNonNull<Edge<P>>; 8]>>
 }
 
 impl<P: Process> Drop for Node<P> {
@@ -53,7 +54,7 @@ impl<P: Process> Node<P> {
     }
 
     pub(super) fn try_expand<'g>(&self, pin: &'g Guard, per_child: P::PerChild) {
-        let edge = Edge::new(per_child);
+        let edge = SafeNonNull::new(Edge::new(per_child));
 
         loop {
             let current = self.edges.load_consume(pin);

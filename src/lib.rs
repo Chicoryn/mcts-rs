@@ -1,6 +1,7 @@
 mod edge;
 mod mcts;
 mod node;
+mod safe_nonnull;
 mod path_iter;
 mod probe_status;
 mod process;
