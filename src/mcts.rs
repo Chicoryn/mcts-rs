@@ -1,4 +1,4 @@
-use crossbeam::epoch;
+use crossbeam_epoch as epoch;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
 use slab::Slab;
 use std::{collections::HashMap, rc::Rc};

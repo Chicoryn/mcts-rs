@@ -1,4 +1,4 @@
-use crossbeam::epoch::Guard;
+use crossbeam_epoch::Guard;
 use std::rc::Rc;
 
 use crate::{

@@ -1,4 +1,4 @@
-use crossbeam::epoch::{Atomic, Owned, Guard};
+use crossbeam_epoch::{Atomic, Owned, Guard};
 use slab::Slab;
 use smallvec::*;
 use std::sync::atomic::Ordering;

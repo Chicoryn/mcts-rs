@@ -12,6 +12,12 @@ harness = false
 name = "goban"
 harness = false
 
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true
+
 [dev-dependencies]
 criterion = "0.3"
 goban = "0.17"
@@ -19,7 +25,7 @@ ordered-float = "3.0"
 rand = "0.8"
 
 [dependencies]
-crossbeam = "0.8"
+crossbeam-epoch = "0.9"
 parking_lot = "0.12"
 slab = "0.4"
 smallvec = "1.8"
