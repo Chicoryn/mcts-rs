@@ -1,19 +1,18 @@
 use crossbeam_epoch as epoch;
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
-use slab::Slab;
+use parking_lot::Mutex;
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     node::*,
     path_iter::PathIter,
-    State, PerChild, Process, Trace, ProbeStatus, SelectResult, Step
+    safe_nonnull::SafeNonNull,
+    State, Process, Trace, ProbeStatus, SelectResult, Step, PerChild
 };
 
 pub struct Mcts<P: Process> {
-    pub(super) root: usize,
+    pub(super) root: SafeNonNull<Node<P>>,
     pub(super) process: P,
-    pub(super) nodes: RwLock<Slab<Node<P>>>,
-    pub(super) transpositions: Mutex<HashMap<u64, usize>>
+    pub(super) transpositions: Mutex<HashMap<u64, SafeNonNull<Node<P>>>>
 }
 
 impl<P: Process> Mcts<P> {
@@ -26,16 +25,15 @@ impl<P: Process> Mcts<P> {
     /// * `state` -
     ///
     pub fn new(process: P, state: P::State) -> Self {
-        let mut nodes = Slab::new();
         let root_hash = state.hash();
-        let root = nodes.insert(Node::new(state));
+        let root = SafeNonNull::new(Node::new(state));
         let mut transpositions = HashMap::with_capacity(32);
 
         if let Some(hash) = root_hash {
             transpositions.insert(hash, root);
         }
 
-        Self { root, process, nodes: RwLock::new(nodes), transpositions: Mutex::new(transpositions) }
+        Self { root, process, transpositions: Mutex::new(transpositions) }
     }
 
     pub fn len(&self) -> usize {
@@ -43,8 +41,8 @@ impl<P: Process> Mcts<P> {
     }
 
     /// Returns the root node of this search tree.
-    pub fn root(&self) -> MappedRwLockReadGuard<P::State> {
-        RwLockReadGuard::map(self.nodes.read(), |slab| slab[self.root].state())
+    pub fn root(&self) -> &P::State {
+        self.root.state()
     }
 
     /// Returns the _best_ sequence of nodes and edges through this search
@@ -55,27 +53,24 @@ impl<P: Process> Mcts<P> {
 
     /// Returns a trace
     pub fn probe<'a>(&'a self) -> (Trace<'a, P>, ProbeStatus) {
-        let nodes = self.nodes.read();
         let pin = Rc::new(epoch::pin());
         let mut trace = Trace::new();
         let mut curr = self.root;
 
         loop {
-            match nodes[curr].select(&pin, &self.process) {
+            match curr.select(&pin, &self.process) {
                 SelectResult::Add(per_child) => {
                     let next_key = per_child.key();
-                    let node = &nodes[curr];
-                    node.try_expand(&pin, per_child);
+                    curr.try_expand(&pin, per_child);
                     trace.push(self, pin.clone(), curr, next_key);
 
                     return (trace, ProbeStatus::Expanded)
                 },
                 SelectResult::Existing(next_key) => {
                     trace.push(self, pin.clone(), curr, next_key);
-                    let edge = nodes[curr].edge(&pin, next_key);
 
-                    if edge.is_valid() {
-                        curr = edge.ptr();
+                    if let Some(next_curr) = curr.edge(&pin, next_key).ptr() {
+                        curr = next_curr;
                     } else {
                         return (trace, ProbeStatus::Busy);
                     }
@@ -85,53 +80,38 @@ impl<P: Process> Mcts<P> {
         }
     }
 
-    fn insert<'g>(&self, trace: &Trace<'_, P>, new_state: P::State) -> RwLockReadGuard<Slab<Node<P>>> {
+    fn insert(&self, trace: &Trace<'_, P>, new_state: P::State) {
         if let Some(last_step) = trace.steps().last() {
             let new_hash = new_state.hash();
-            let mut transpositions = self.transpositions.lock();
-            let transposed_child = new_hash.and_then(|hash| transpositions.get(&hash).cloned());
+            let transposed_child = new_hash.and_then(|hash| self.transpositions.lock().get(&hash).cloned());
 
             if let Some(transposed_child) = transposed_child {
-                let nodes = self.nodes.read();
-                let edge = nodes[last_step.ptr].edge(last_step.pin(), last_step.key);
+                let edge = last_step.ptr.edge(last_step.pin(), last_step.key);
                 edge.try_insert(transposed_child);
-
-                nodes
             } else {
-                let new_child = self.nodes.write().insert(Node::new(new_state));
-                let nodes = self.nodes.read();
-                if let Some(hash) = new_hash {
-                    transpositions.insert(hash, new_child);
-                }
+                let mut new_child = SafeNonNull::new(Node::new(new_state));
 
-                if !nodes[last_step.ptr].edge(last_step.pin(), last_step.key).try_insert(new_child) {
-                    drop(nodes);
-
-                    let mut nodes_mut = self.nodes.write();
-                    nodes_mut.remove(new_child);
-                    RwLockWriteGuard::downgrade(nodes_mut)
+                if last_step.ptr.edge(last_step.pin(), last_step.key).try_insert(new_child.clone()) {
+                    if let Some(hash) = new_hash {
+                        self.transpositions.lock().insert(hash, new_child);
+                    }
                 } else {
-                    nodes
+                    new_child.drop();
                 }
             }
-        } else {
-            self.nodes.read()
         }
     }
 
     pub fn update(&self, trace: Trace<'_, P>, state: Option<P::State>, up: P::Update) {
-        let nodes =
-            if let Some(new_state) = state {
-                self.insert(&trace, new_state)
-            } else {
-                self.nodes.read()
-            };
+        if let Some(new_state) = state {
+            self.insert(&trace, new_state)
+        }
 
         for step in trace.steps() {
-            let node = &nodes[step.ptr];
+            let node = &step.ptr;
             let edge = node.edge(step.pin(), step.key);
 
-            self.process.update(node.state(), edge.per_child(), &up, edge.is_valid());
+            self.process.update(node.state(), edge.per_child(), &up, edge.ptr().is_some());
         }
     }
 }

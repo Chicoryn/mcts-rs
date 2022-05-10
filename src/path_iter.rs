@@ -1,17 +1,23 @@
 use crossbeam_epoch as epoch;
 use std::rc::Rc;
 
-use crate::{Mcts, process::Process, Step};
+use crate::{
+    safe_nonnull::SafeNonNull,
+    node::Node,
+    process::Process,
+    Mcts,
+    Step
+};
 
 pub struct PathIter<'a, P: Process> {
     search_tree: &'a Mcts<P>,
     pin: Rc<epoch::Guard>,
-    current: usize
+    current: Option<SafeNonNull<Node<P>>>
 }
 
 impl<'a, P: Process> PathIter<'a, P> {
     pub(super) fn new(search_tree: &'a Mcts<P>) -> Self {
-        let current = search_tree.root;
+        let current = Some(search_tree.root);
         let pin = Rc::new(epoch::pin());
 
         Self { search_tree, pin, current }
@@ -27,17 +33,12 @@ impl<'a, P: Process> Iterator for PathIter<'a, P> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let search_tree = self.search_tree;
-        let nodes = search_tree.nodes.read();
         let curr = self.current;
 
-        if let Some((key, edge)) = nodes.get(curr).and_then(|node| node.best(self.pin(), &search_tree.process)) {
-            if edge.is_valid() {
-                self.current = edge.ptr();
-            } else {
-                self.current = usize::MAX;
-            }
+        if let Some((key, edge)) = curr.and_then(|node| node.best(self.pin(), &search_tree.process)) {
+            self.current = edge.ptr();
 
-            Some(Step::new(search_tree, self.pin.clone(), curr, key))
+            Some(Step::new(search_tree, self.pin.clone(), curr.unwrap(), key))
         } else {
             None
         }

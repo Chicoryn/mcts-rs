@@ -3,7 +3,10 @@ use std::rc::Rc;
 
 use crate::{
     process::{PerChild, Process},
-    step::Step, Mcts,
+    safe_nonnull::SafeNonNull,
+    node::Node,
+    step::Step,
+    Mcts,
 };
 
 pub struct Trace<'a, P: Process> {
@@ -16,7 +19,7 @@ impl<'a, P: Process> Trace<'a, P> {
         Self { steps: vec! [] }
     }
 
-    pub(super) fn push(&mut self, search_tree: &'a Mcts<P>, pin: Rc<Guard>, ptr: usize, key: <P::PerChild as PerChild>::Key) {
+    pub(super) fn push(&mut self, search_tree: &'a Mcts<P>, pin: Rc<Guard>, ptr: SafeNonNull<Node<P>>, key: <P::PerChild as PerChild>::Key) {
         self.steps.push(Step::new(search_tree, pin, ptr, key));
     }
 
