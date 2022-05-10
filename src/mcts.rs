@@ -1,6 +1,6 @@
 use crossbeam_epoch as epoch;
-use parking_lot::Mutex;
-use std::{collections::HashMap, rc::Rc};
+use dashmap::DashMap;
+use std::rc::Rc;
 
 use crate::{
     node::*,
@@ -12,7 +12,7 @@ use crate::{
 pub struct Mcts<P: Process> {
     pub(super) root: SafeNonNull<Node<P>>,
     pub(super) process: P,
-    pub(super) transpositions: Mutex<HashMap<u64, SafeNonNull<Node<P>>>>
+    pub(super) transpositions: DashMap<u64, SafeNonNull<Node<P>>>
 }
 
 impl<P: Process> Mcts<P> {
@@ -27,17 +27,17 @@ impl<P: Process> Mcts<P> {
     pub fn new(process: P, state: P::State) -> Self {
         let root_hash = state.hash();
         let root = SafeNonNull::new(Node::new(state));
-        let mut transpositions = HashMap::with_capacity(32);
+        let transpositions = DashMap::with_capacity(32);
 
         if let Some(hash) = root_hash {
             transpositions.insert(hash, root);
         }
 
-        Self { root, process, transpositions: Mutex::new(transpositions) }
+        Self { root, process, transpositions }
     }
 
     pub fn len(&self) -> usize {
-        self.transpositions.lock().len()
+        self.transpositions.len()
     }
 
     /// Returns the root node of this search tree.
@@ -83,7 +83,7 @@ impl<P: Process> Mcts<P> {
     fn insert(&self, trace: &Trace<'_, P>, new_state: P::State) {
         if let Some(last_step) = trace.steps().last() {
             let new_hash = new_state.hash();
-            let transposed_child = new_hash.and_then(|hash| self.transpositions.lock().get(&hash).cloned());
+            let transposed_child = new_hash.and_then(|hash| self.transpositions.get(&hash)).map(|entry| entry.value().clone());
 
             if let Some(transposed_child) = transposed_child {
                 let edge = last_step.ptr.edge(last_step.pin(), last_step.key);
@@ -93,7 +93,7 @@ impl<P: Process> Mcts<P> {
 
                 if last_step.ptr.edge(last_step.pin(), last_step.key).try_insert(new_child.clone()) {
                     if let Some(hash) = new_hash {
-                        self.transpositions.lock().insert(hash, new_child);
+                        self.transpositions.insert(hash, new_child);
                     }
                 } else {
                     new_child.drop();

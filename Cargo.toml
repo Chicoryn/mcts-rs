@@ -26,6 +26,5 @@ rand = "0.8"
 
 [dependencies]
 crossbeam-epoch = "0.9"
-parking_lot = "0.12"
-slab = "0.4"
+dashmap = "5.3"
 smallvec = "1.8"
