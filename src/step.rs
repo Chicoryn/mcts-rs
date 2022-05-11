@@ -42,3 +42,20 @@ impl<'a, P: Process> Step<'a, P, Node<P>> {
         self.ptr.map(self.pin(), self.key, |state, _, per_child| f(state, per_child))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::FakeProcess;
+    use crossbeam_epoch as epoch;
+    use super::*;
+
+    #[test]
+    fn new_sets_key_and_ptr() {
+        let process = FakeProcess::new(0, 0);
+        let pin = epoch::pin();
+        let step = Step::new(&process, Rc::new(pin), SafeNonNull::new(()), 1);
+
+        assert_eq!(step.ptr(), &());
+        assert_eq!(step.key(), 1);
+    }
+}
