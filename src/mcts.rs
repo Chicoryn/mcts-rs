@@ -4,9 +4,9 @@ use dashmap::DashMap;
 use std::rc::Rc;
 
 pub struct Mcts<P: Process> {
-    pub(super) root: SafeNonNull<Node<P>>,
-    pub(super) process: P,
-    pub(super) transpositions: DashMap<u64, SafeNonNull<Node<P>>>
+    root: SafeNonNull<Node<P>>,
+    process: P,
+    transpositions: DashMap<u64, SafeNonNull<Node<P>>>
 }
 
 impl<P: Process> Drop for Mcts<P> {
