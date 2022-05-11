@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 
 pub(super) struct Node<P: Process> {
     state: P::State,
-    edges: Atomic<SmallVec<[SafeNonNull<Edge<P>>; 8]>>
+    edges: Atomic<SmallVec<[SafeNonNull<Edge<P, Node<P>>>; 8]>>
 }
 
 impl<P: Process> Drop for Node<P> {
@@ -26,7 +26,7 @@ impl<P: Process> Node<P> {
         Self { state, edges }
     }
 
-    pub(super) fn best<'g>(&self, pin: &'g Guard, process: &P) -> Option<(<P::PerChild as PerChild>::Key, &'g Edge<P>)> {
+    pub(super) fn best<'g>(&self, pin: &'g Guard, process: &P) -> Option<(<P::PerChild as PerChild>::Key, &'g Edge<P, Node<P>>)> {
         let edges = unsafe { self.edges.load_consume(pin).deref() };
 
         if let Some(key) = process.best(&self.state, edges.iter().map(|edge| edge.per_child())) {
@@ -40,7 +40,7 @@ impl<P: Process> Node<P> {
         &self.state
     }
 
-    pub(super) fn edge<'g>(&self, pin: &'g Guard, key: <<P as Process>::PerChild as PerChild>::Key) -> &'g Edge<P> {
+    pub(super) fn edge<'g>(&self, pin: &'g Guard, key: <<P as Process>::PerChild as PerChild>::Key) -> &'g Edge<P, Node<P>> {
         let edges = unsafe { self.edges.load_consume(pin).deref() };
 
         edges.binary_search_by_key(&key, |edge| edge.key()).map(|i| {
@@ -70,7 +70,7 @@ impl<P: Process> Node<P> {
         process.select(&self.state, edges.iter().map(|edge| edge.per_child()))
     }
 
-    pub(super) fn map<'g, T>(&self, pin: &'g Guard, key: <P::PerChild as PerChild>::Key, f: impl FnOnce(&P::State, &Edge<P>, &P::PerChild) -> T) -> T {
+    pub(super) fn map<'g, T>(&self, pin: &'g Guard, key: <P::PerChild as PerChild>::Key, f: impl FnOnce(&P::State, &Edge<P, Node<P>>, &P::PerChild) -> T) -> T {
         let edges = unsafe { self.edges.load_consume(pin).deref() };
         let edge = edges.binary_search_by_key(&key, |edge| edge.key()).map(|i| {
             &edges[i]

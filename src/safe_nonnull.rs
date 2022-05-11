@@ -1,6 +1,7 @@
 use std::{ptr::NonNull, ops::{Deref, DerefMut}};
 
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct SafeNonNull<T> {
     ptr: NonNull<T>
 }
@@ -51,5 +52,11 @@ impl<T> Deref for SafeNonNull<T> {
 impl<T> DerefMut for SafeNonNull<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.ptr.as_mut() }
+    }
+}
+
+impl<T> PartialEq for SafeNonNull<T> {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.ptr.eq(&rhs.ptr)
     }
 }
