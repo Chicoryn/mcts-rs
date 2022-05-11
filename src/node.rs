@@ -1,12 +1,7 @@
+use crate::{edge::Edge, process::{PerChild, SelectResult, Process}, safe_nonnull::SafeNonNull};
 use crossbeam_epoch::{self as epoch, Atomic, Owned, Guard};
 use smallvec::*;
 use std::sync::atomic::Ordering;
-
-use crate::{
-    edge::Edge,
-    process::{PerChild, SelectResult, Process},
-    safe_nonnull::SafeNonNull
-};
 
 pub(super) struct Node<P: Process> {
     state: P::State,

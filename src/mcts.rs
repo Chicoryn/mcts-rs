@@ -1,13 +1,7 @@
+use crate::{node::Node, path_iter::PathIter, probe_status::ProbeStatus, process::{State, Process, PerChild, SelectResult}, safe_nonnull::SafeNonNull, step::Step, trace::Trace};
 use crossbeam_epoch as epoch;
 use dashmap::DashMap;
 use std::rc::Rc;
-
-use crate::{
-    node::*,
-    path_iter::PathIter,
-    safe_nonnull::SafeNonNull,
-    State, Process, Trace, ProbeStatus, SelectResult, Step, PerChild
-};
 
 pub struct Mcts<P: Process> {
     pub(super) root: SafeNonNull<Node<P>>,
@@ -94,12 +88,12 @@ impl<P: Process> Mcts<P> {
             let transposed_child = new_hash.and_then(|hash| self.transpositions.get(&hash)).map(|entry| entry.value().clone());
 
             if let Some(transposed_child) = transposed_child {
-                let edge = last_step.ptr.edge(last_step.pin(), last_step.key);
+                let edge = last_step.ptr().edge(last_step.pin(), last_step.key());
                 edge.try_insert(transposed_child);
             } else {
                 let mut new_child = SafeNonNull::new(Node::new(new_state));
 
-                if last_step.ptr.edge(last_step.pin(), last_step.key).try_insert(new_child.clone()) {
+                if last_step.ptr().edge(last_step.pin(), last_step.key()).try_insert(new_child.clone()) {
                     if let Some(hash) = new_hash {
                         self.transpositions.insert(hash, new_child);
                     }
@@ -116,8 +110,8 @@ impl<P: Process> Mcts<P> {
         }
 
         for step in trace.steps() {
-            let node = &step.ptr;
-            let edge = node.edge(step.pin(), step.key);
+            let node = &step.ptr();
+            let edge = node.edge(step.pin(), step.key());
 
             self.process.update(node.state(), edge.per_child(), &up, edge.ptr().is_some());
         }

@@ -1,13 +1,6 @@
+use crate::{mcts::Mcts, node::Node, process::Process, safe_nonnull::SafeNonNull, step::Step};
 use crossbeam_epoch as epoch;
 use std::rc::Rc;
-
-use crate::{
-    safe_nonnull::SafeNonNull,
-    node::Node,
-    process::Process,
-    Mcts,
-    Step
-};
 
 pub struct PathIter<'a, P: Process> {
     search_tree: &'a Mcts<P>,

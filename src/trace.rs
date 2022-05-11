@@ -1,13 +1,6 @@
+use crate::{mcts::Mcts, node::Node, process::{PerChild, Process}, safe_nonnull::SafeNonNull, step::Step};
 use crossbeam_epoch::Guard;
 use std::rc::Rc;
-
-use crate::{
-    process::{PerChild, Process},
-    safe_nonnull::SafeNonNull,
-    node::Node,
-    step::Step,
-    Mcts,
-};
 
 pub struct Trace<'a, P: Process> {
     steps: Vec<Step<'a, P>>,

@@ -1,9 +1,5 @@
-use std::{
-    sync::atomic::{AtomicPtr, Ordering},
-    ptr::null_mut
-};
-
-use crate::{process::Process, PerChild, node::Node, safe_nonnull::SafeNonNull};
+use crate::{process::{Process, PerChild}, node::Node, safe_nonnull::SafeNonNull};
+use std::{sync::atomic::{AtomicPtr, Ordering}, ptr::null_mut};
 
 pub struct Edge<P: Process> {
     ptr: AtomicPtr<Node<P>>,

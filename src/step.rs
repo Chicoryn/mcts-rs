@@ -1,17 +1,11 @@
+use crate::{mcts::Mcts, node::Node, process::{PerChild, Process}, safe_nonnull::SafeNonNull};
 use crossbeam_epoch::Guard;
 use std::{rc::Rc, marker::PhantomData};
 
-use crate::{
-    process::{PerChild, Process},
-    safe_nonnull::SafeNonNull,
-    node::Node,
-    Mcts,
-};
-
 pub struct Step<'a, P: Process> {
-    pub(super) pin: Rc<Guard>,
-    pub(super) ptr: SafeNonNull<Node<P>>,
-    pub(super) key: <P::PerChild as PerChild>::Key,
+    pin: Rc<Guard>,
+    ptr: SafeNonNull<Node<P>>,
+    key: <P::PerChild as PerChild>::Key,
     search_tree: PhantomData<&'a Mcts<P>>
 }
 
@@ -24,6 +18,15 @@ impl<'a, P: Process> Step<'a, P> {
 
     pub(super) fn pin(&self) -> &Guard {
         self.pin.as_ref()
+    }
+
+    pub(super) fn ptr(&self) -> &Node<P> {
+        &*self.ptr
+    }
+
+    /// Returns the key that is associated with this step.
+    pub fn key(&self) -> <P::PerChild as PerChild>::Key {
+        self.key
     }
 
     /// Returns the result of calling the given `mapper` on this steps `state`
