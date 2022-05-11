@@ -49,12 +49,12 @@ impl<P: Process> Mcts<P> {
 
     /// Returns the _best_ sequence of nodes and edges through this search
     /// tree.
-    pub fn path<'a>(&'a self) -> impl Iterator<Item=Step<'a, P>> {
+    pub fn path<'a>(&'a self) -> impl Iterator<Item=Step<'a, P, Node<P>>> {
         PathIter::new(&self.process, self.root)
     }
 
     /// Returns a trace
-    pub fn probe<'a>(&'a self) -> (Trace<'a, P>, ProbeStatus) {
+    pub fn probe<'a>(&'a self) -> (Trace<'a, P, Node<P>>, ProbeStatus) {
         let pin = Rc::new(epoch::pin());
         let mut trace = Trace::new();
         let mut curr = self.root;
@@ -82,7 +82,7 @@ impl<P: Process> Mcts<P> {
         }
     }
 
-    fn insert(&self, trace: &Trace<'_, P>, new_state: P::State) {
+    fn insert(&self, trace: &Trace<'_, P, Node<P>>, new_state: P::State) {
         if let Some(last_step) = trace.steps().last() {
             let new_hash = new_state.hash();
             let transposed_child = new_hash.and_then(|hash| self.transpositions.get(&hash)).map(|entry| entry.value().clone());
@@ -104,7 +104,7 @@ impl<P: Process> Mcts<P> {
         }
     }
 
-    pub fn update(&self, trace: Trace<'_, P>, state: Option<P::State>, up: P::Update) {
+    pub fn update(&self, trace: Trace<'_, P, Node<P>>, state: Option<P::State>, up: P::Update) {
         if let Some(new_state) = state {
             self.insert(&trace, new_state)
         }

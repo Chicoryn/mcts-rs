@@ -3,7 +3,7 @@ use crossbeam_epoch::{self as epoch, Atomic, Owned, Guard};
 use smallvec::*;
 use std::sync::atomic::Ordering;
 
-pub(super) struct Node<P: Process> {
+pub struct Node<P: Process> {
     state: P::State,
     edges: Atomic<SmallVec<[SafeNonNull<Edge<P, Node<P>>>; 8]>>
 }

@@ -14,3 +14,4 @@ pub use self::probe_status::*;
 pub use self::process::*;
 pub use self::step::*;
 pub use self::trace::*;
+pub use self::node::*;

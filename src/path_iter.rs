@@ -22,7 +22,7 @@ impl<'a, P: Process> PathIter<'a, P> {
 }
 
 impl<'a, P: Process> Iterator for PathIter<'a, P> {
-    type Item = Step<'a, P>;
+    type Item = Step<'a, P, Node<P>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let curr = self.current;
