@@ -15,6 +15,14 @@ pub struct Mcts<P: Process> {
     pub(super) transpositions: DashMap<u64, SafeNonNull<Node<P>>>
 }
 
+impl<P: Process> Drop for Mcts<P> {
+    fn drop(&mut self) {
+        for mut entry in self.transpositions.iter_mut() {
+            entry.value_mut().drop();
+        }
+    }
+}
+
 impl<P: Process> Mcts<P> {
     /// Returns a new monte-carlo search tree for the given `process` and
     /// initial `state`.

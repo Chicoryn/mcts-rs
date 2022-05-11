@@ -15,8 +15,8 @@ pub(super) struct Node<P: Process> {
 
 impl<P: Process> Drop for Node<P> {
     fn drop(&mut self) {
-        let pin = epoch::pin();
-        let edges = unsafe { self.edges.load_consume(&pin).deref_mut() };
+        let pin = unsafe { epoch::unprotected() };
+        let mut edges = unsafe { self.edges.load_consume(&pin).into_owned() };
 
         for mut edge in edges.drain(..) {
             edge.drop();
