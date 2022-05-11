@@ -60,3 +60,29 @@ impl<T> PartialEq for SafeNonNull<T> {
         self.ptr.eq(&rhs.ptr)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_create_non_null() {
+        assert!(!SafeNonNull::new(()).into_raw().is_null());
+    }
+
+    #[test]
+    fn clone_copy_ptr() {
+        let original = SafeNonNull::new(());
+        let clone = original.clone();
+
+        assert_eq!(original.into_raw(), clone.into_raw());
+        assert_eq!(original, clone);
+    }
+
+    #[test]
+    fn from_raw_set_ptr() {
+        let ptr = Box::into_raw(Box::new(()));
+
+        assert_eq!(SafeNonNull::from_raw(ptr).into_raw(), ptr);
+    }
+}
