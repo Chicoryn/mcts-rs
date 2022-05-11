@@ -1,4 +1,4 @@
-use crate::{mcts::Mcts, node::Node, process::{PerChild, Process}, safe_nonnull::SafeNonNull, step::Step};
+use crate::{node::Node, process::{PerChild, Process}, safe_nonnull::SafeNonNull, step::Step};
 use crossbeam_epoch::Guard;
 use std::rc::Rc;
 
@@ -12,8 +12,8 @@ impl<'a, P: Process> Trace<'a, P> {
         Self { steps: vec! [] }
     }
 
-    pub(super) fn push(&mut self, search_tree: &'a Mcts<P>, pin: Rc<Guard>, ptr: SafeNonNull<Node<P>>, key: <P::PerChild as PerChild>::Key) {
-        self.steps.push(Step::new(search_tree, pin, ptr, key));
+    pub(super) fn push(&mut self, process: &'a P, pin: Rc<Guard>, ptr: SafeNonNull<Node<P>>, key: <P::PerChild as PerChild>::Key) {
+        self.steps.push(Step::new(process, pin, ptr, key));
     }
 
     /// Returns if there are no steps in this trace.

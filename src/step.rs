@@ -1,4 +1,4 @@
-use crate::{mcts::Mcts, node::Node, process::{PerChild, Process}, safe_nonnull::SafeNonNull};
+use crate::{node::Node, process::{PerChild, Process}, safe_nonnull::SafeNonNull};
 use crossbeam_epoch::Guard;
 use std::{rc::Rc, marker::PhantomData};
 
@@ -6,14 +6,14 @@ pub struct Step<'a, P: Process> {
     pin: Rc<Guard>,
     ptr: SafeNonNull<Node<P>>,
     key: <P::PerChild as PerChild>::Key,
-    search_tree: PhantomData<&'a Mcts<P>>
+    process: PhantomData<&'a P>
 }
 
 impl<'a, P: Process> Step<'a, P> {
-    pub(super) fn new(_: &'a Mcts<P>, pin: Rc<Guard>, ptr: SafeNonNull<Node<P>>, key: <P::PerChild as PerChild>::Key) -> Self {
-        let search_tree = PhantomData::default();
+    pub(super) fn new(_: &'a P, pin: Rc<Guard>, ptr: SafeNonNull<Node<P>>, key: <P::PerChild as PerChild>::Key) -> Self {
+        let process = PhantomData::default();
 
-        Self { search_tree, pin, ptr, key }
+        Self { process, pin, ptr, key }
     }
 
     pub(super) fn pin(&self) -> &Guard {

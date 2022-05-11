@@ -8,6 +8,7 @@ pub trait PerChild {
     fn key(&self) -> Self::Key;
 }
 
+#[derive(Debug, PartialEq)]
 pub enum SelectResult<P: PerChild> {
     Add(P),
     Existing(P::Key),
@@ -58,6 +59,13 @@ pub trait Process {
 pub struct FakeState;
 
 #[cfg(test)]
+impl FakeState {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[cfg(test)]
 impl State for FakeState {
     fn hash(&self) -> Option<u64> {
         None
@@ -65,7 +73,7 @@ impl State for FakeState {
 }
 
 #[cfg(test)]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FakePerChild {
     key: u32
 }
@@ -87,7 +95,17 @@ impl PerChild for FakePerChild {
 }
 
 #[cfg(test)]
-pub struct FakeProcess;
+pub struct FakeProcess {
+    best: u32,
+    select: u32,
+}
+
+#[cfg(test)]
+impl FakeProcess {
+    pub fn new(best: u32, select: u32) -> Self {
+        Self { best, select }
+    }
+}
 
 #[cfg(test)]
 impl Process for FakeProcess {
@@ -96,11 +114,11 @@ impl Process for FakeProcess {
     type Update = ();
 
     fn best<'a>(&self, _: &Self::State, _: impl Iterator<Item=&'a Self::PerChild>) -> Option<<Self::PerChild as PerChild>::Key> where Self::PerChild: 'a {
-        Some(0)
+        Some(self.best)
     }
 
     fn select<'a>(&self, _: &Self::State, _: impl Iterator<Item=&'a Self::PerChild>) -> SelectResult<Self::PerChild> where Self::PerChild: 'a {
-        SelectResult::Add(FakePerChild::new(0))
+        SelectResult::Add(FakePerChild::new(self.select))
     }
 
     fn update(&self, _: &Self::State, _: &Self::PerChild, _: &Self::Update, _: bool) {

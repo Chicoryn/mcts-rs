@@ -50,7 +50,7 @@ impl<P: Process> Mcts<P> {
     /// Returns the _best_ sequence of nodes and edges through this search
     /// tree.
     pub fn path<'a>(&'a self) -> impl Iterator<Item=Step<'a, P>> {
-        PathIter::new(self)
+        PathIter::new(&self.process, self.root)
     }
 
     /// Returns a trace
@@ -64,14 +64,14 @@ impl<P: Process> Mcts<P> {
                 SelectResult::Add(per_child) => {
                     let next_key = per_child.key();
                     curr.try_expand(&pin, per_child);
-                    trace.push(self, pin.clone(), curr, next_key);
+                    trace.push(&self.process, pin.clone(), curr, next_key);
 
                     return (trace, ProbeStatus::Expanded)
                 },
                 SelectResult::Existing(next_key) => {
-                    trace.push(self, pin.clone(), curr, next_key);
+                    trace.push(&self.process, pin.clone(), curr, next_key);
 
-                    if let Some(next_curr) = curr.edge(&pin, next_key).ptr() {
+                    if let Some(next_curr) = curr.edge(&pin, next_key).and_then(|edge| edge.ptr()) {
                         curr = next_curr;
                     } else {
                         return (trace, ProbeStatus::Busy);
@@ -88,12 +88,12 @@ impl<P: Process> Mcts<P> {
             let transposed_child = new_hash.and_then(|hash| self.transpositions.get(&hash)).map(|entry| entry.value().clone());
 
             if let Some(transposed_child) = transposed_child {
-                let edge = last_step.ptr().edge(last_step.pin(), last_step.key());
+                let edge = last_step.ptr().edge(last_step.pin(), last_step.key()).unwrap();
                 edge.try_insert(transposed_child);
             } else {
                 let mut new_child = SafeNonNull::new(Node::new(new_state));
 
-                if last_step.ptr().edge(last_step.pin(), last_step.key()).try_insert(new_child.clone()) {
+                if last_step.ptr().edge(last_step.pin(), last_step.key()).map(|edge| edge.try_insert(new_child.clone())).unwrap_or(false) {
                     if let Some(hash) = new_hash {
                         self.transpositions.insert(hash, new_child);
                     }
@@ -111,7 +111,7 @@ impl<P: Process> Mcts<P> {
 
         for step in trace.steps() {
             let node = &step.ptr();
-            let edge = node.edge(step.pin(), step.key());
+            let edge = node.edge(step.pin(), step.key()).unwrap();
 
             self.process.update(node.state(), edge.per_child(), &up, edge.ptr().is_some());
         }
