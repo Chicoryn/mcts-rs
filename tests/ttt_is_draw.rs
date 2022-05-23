@@ -1,5 +1,13 @@
 mod tic_tac_toe;
 
+/// ```
+/// . . .
+/// . . .
+/// . . .
+/// ```
+///
+/// - Is a draw
+///
 #[test]
 fn is_draw() {
     tic_tac_toe::assert_search(
