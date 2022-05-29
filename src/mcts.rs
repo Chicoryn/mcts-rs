@@ -1,7 +1,7 @@
 use crate::{node::Node, path_iter::PathIter, probe_status::ProbeStatus, process::{State, Process, PerChild, SelectResult}, safe_nonnull::SafeNonNull, step::Step, trace::Trace};
 use crossbeam_epoch as epoch;
 use dashmap::DashMap;
-use std::rc::Rc;
+use std::{collections::HashSet, ops::DerefMut, rc::Rc};
 
 pub struct Mcts<P: Process> {
     root: SafeNonNull<Node<P>>,
@@ -11,8 +11,12 @@ pub struct Mcts<P: Process> {
 
 impl<P: Process> Drop for Mcts<P> {
     fn drop(&mut self) {
-        for mut entry in self.transpositions.iter_mut() {
-            entry.value_mut().drop();
+        let mut already_dropped = HashSet::with_capacity(self.len());
+        let pin = unsafe { epoch::unprotected() };
+
+        self.root.deref_mut().drop(pin, &mut already_dropped);
+        if already_dropped.insert(self.root.into_raw()) {
+            self.root.drop();
         }
     }
 }
@@ -91,7 +95,7 @@ impl<P: Process> Mcts<P> {
                 let edge = last_step.ptr().edge(last_step.pin(), last_step.key()).unwrap();
                 edge.try_insert(transposed_child);
             } else {
-                let mut new_child = SafeNonNull::new(Node::new(new_state));
+                let new_child = SafeNonNull::new(Node::new(new_state));
 
                 if last_step.ptr().edge(last_step.pin(), last_step.key()).map(|edge| edge.try_insert(new_child.clone())).unwrap_or(false) {
                     if let Some(hash) = new_hash {

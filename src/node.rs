@@ -1,7 +1,7 @@
 use crate::{edge::Edge, process::{PerChild, SelectResult, Process}, safe_nonnull::SafeNonNull};
-use crossbeam_epoch::{self as epoch, Atomic, Owned, Guard};
+use crossbeam_epoch::{Atomic, Owned, Guard};
 use smallvec::*;
-use std::sync::atomic::Ordering;
+use std::{collections::HashSet, ops::DerefMut, mem, sync::atomic::Ordering};
 
 pub struct Node<P: Process> {
     state: P::State,
@@ -10,11 +10,8 @@ pub struct Node<P: Process> {
 
 impl<P: Process> Drop for Node<P> {
     fn drop(&mut self) {
-        let pin = unsafe { epoch::unprotected() };
-        let mut edges = unsafe { self.edges.load_consume(&pin).into_owned() };
-
-        for mut edge in edges.drain(..) {
-            edge.drop();
+        unsafe {
+            drop(mem::replace(&mut self.edges, Atomic::null()).into_owned());
         }
     }
 }
@@ -24,6 +21,21 @@ impl<P: Process> Node<P> {
         let edges = Atomic::new(smallvec! []);
 
         Self { state, edges }
+    }
+
+    pub(super) fn drop(&mut self, pin: &Guard, already_dropped: &mut HashSet<*mut Node<P>>) {
+        let edges = unsafe { self.edges.load_consume(pin).deref() };
+
+        for edge in edges {
+            if let Some(mut ptr) = edge.ptr() {
+                if already_dropped.insert(ptr.into_raw()) {
+                    ptr.deref_mut().drop(pin, already_dropped);
+                    ptr.drop();
+                }
+            }
+
+            edge.drop();
+        }
     }
 
     pub(super) fn best<'g>(&self, pin: &'g Guard, process: &P) -> Option<(<P::PerChild as PerChild>::Key, &'g Edge<P, Node<P>>)> {
@@ -57,16 +69,22 @@ impl<P: Process> Node<P> {
 
     pub(super) fn try_expand<'g>(&self, pin: &'g Guard, per_child: P::PerChild) {
         let edge = SafeNonNull::new(Edge::new(per_child));
+        let mut current = self.edges.load_consume(pin);
 
         loop {
-            let current = self.edges.load_consume(pin);
             let mut edges = unsafe { current.deref() }.clone();
 
             edges.push(edge.clone());
             edges.sort_unstable_by_key(|edge| edge.key());
 
-            if self.edges.compare_exchange_weak(current, Owned::new(edges), Ordering::AcqRel, Ordering::Relaxed, &pin).is_ok() {
-                break
+            match self.edges.compare_exchange_weak(current, Owned::new(edges), Ordering::AcqRel, Ordering::Relaxed, &pin) {
+                Ok(_) => {
+                    unsafe { pin.defer_destroy(current) };
+                    break
+                },
+                Err(err) => {
+                    current = err.current;
+                }
             }
         }
     }
@@ -87,6 +105,7 @@ impl<P: Process> Node<P> {
 #[cfg(test)]
 mod tests {
     use crate::{FakePerChild, FakeProcess, FakeState};
+    use crossbeam_epoch as epoch;
     use super::*;
 
     #[test]

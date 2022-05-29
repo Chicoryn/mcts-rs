@@ -24,7 +24,7 @@ impl<T> SafeNonNull<T> {
         self.ptr.as_ptr()
     }
 
-    pub(super) fn drop(&mut self) {
+    pub(super) fn drop(&self) {
         drop(unsafe { Box::from_raw(self.ptr.as_ptr()) })
     }
 }
