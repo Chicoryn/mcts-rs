@@ -14,8 +14,8 @@ impl<P: Process> Drop for Mcts<P> {
         let mut already_dropped = HashSet::with_capacity(self.len());
         let pin = unsafe { epoch::unprotected() };
 
-        self.root.deref_mut().drop(pin, &mut already_dropped);
-        if already_dropped.insert(self.root.into_raw()) {
+        self.root.deref_mut().recursive_drop(pin, &mut already_dropped);
+        if already_dropped.insert(self.root.as_ptr()) {
             self.root.drop();
         }
     }
@@ -27,8 +27,8 @@ impl<P: Process> Mcts<P> {
     ///
     /// # Arguments
     ///
-    /// * `process` -
-    /// * `state` -
+    /// * `process` - the monte carlo process to evaluate
+    /// * `state` - the initial root state
     ///
     pub fn new(process: P, state: P::State) -> Self {
         let root_hash = state.hash();
@@ -42,11 +42,18 @@ impl<P: Process> Mcts<P> {
         Self { root, process, transpositions }
     }
 
+    /// Returns the number of entries in the transposition table. This should
+    /// correspond to the number of *unique* nodes in the search tree.
     pub fn len(&self) -> usize {
         self.transpositions.len()
     }
 
-    /// Returns the root node of this search tree.
+    /// Returns the process being evaluated by this search tree.
+    pub fn process(&self) -> &P {
+        &self.process
+    }
+
+    /// Returns the state of the root node in this search tree.
     pub fn root(&self) -> &P::State {
         self.root.state()
     }

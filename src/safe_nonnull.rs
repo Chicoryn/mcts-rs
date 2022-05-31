@@ -16,11 +16,11 @@ impl<T> SafeNonNull<T> {
 
     pub(super) fn from_raw(x: *mut T) -> Self {
         Self {
-            ptr: unsafe { NonNull::new_unchecked(x) }
+            ptr: NonNull::new(x).unwrap()
         }
     }
 
-    pub(super) fn into_raw(&self) -> *mut T {
+    pub(super) fn as_ptr(&self) -> *mut T {
         self.ptr.as_ptr()
     }
 
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn new_create_non_null() {
-        assert!(!SafeNonNull::new(()).into_raw().is_null());
+        assert!(!SafeNonNull::new(()).as_ptr().is_null());
     }
 
     #[test]
@@ -75,7 +75,7 @@ mod tests {
         let original = SafeNonNull::new(());
         let clone = original.clone();
 
-        assert_eq!(original.into_raw(), clone.into_raw());
+        assert_eq!(original.as_ptr(), clone.as_ptr());
         assert_eq!(original, clone);
     }
 
@@ -83,6 +83,6 @@ mod tests {
     fn from_raw_set_ptr() {
         let ptr = Box::into_raw(Box::new(()));
 
-        assert_eq!(SafeNonNull::from_raw(ptr).into_raw(), ptr);
+        assert_eq!(SafeNonNull::from_raw(ptr).as_ptr(), ptr);
     }
 }

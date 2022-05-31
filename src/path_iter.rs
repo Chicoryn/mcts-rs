@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn next_gets_full_path() {
-        let pin = unsafe { epoch::unprotected() };
+        let pin = epoch::pin();
         let root = SafeNonNull::new(Node::new(FakeState::new()));
         root.try_expand(&pin, FakePerChild::new(1));
         let process = FakeProcess::new(1, 0);

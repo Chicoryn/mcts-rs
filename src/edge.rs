@@ -48,7 +48,7 @@ impl<P: Process, Node> Edge<P, Node> {
     /// * `new_ptr` -
     ///
     pub(super) fn try_insert(&self, new_ptr: SafeNonNull<Node>) -> bool {
-        self.ptr.compare_exchange_weak(null_mut(), new_ptr.into_raw(), Ordering::AcqRel, Ordering::Relaxed).is_ok()
+        self.ptr.compare_exchange_weak(null_mut(), new_ptr.as_ptr(), Ordering::AcqRel, Ordering::Relaxed).is_ok()
     }
 }
 

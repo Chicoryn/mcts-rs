@@ -3,7 +3,8 @@ use mcts_rs::{uct, PerChild, Process, Mcts, SelectResult, State};
 use ordered_float::OrderedFloat;
 use rand::{prelude::SliceRandom, Rng, thread_rng};
 use smallvec::SmallVec;
-use std::{ops::Deref, sync::{Arc, Barrier}, thread, collections::hash_map::DefaultHasher, hash::Hasher};
+use std::{sync::{Arc, Barrier}, collections::hash_map::DefaultHasher, hash::Hasher};
+use threadpool::ThreadPool;
 
 #[derive(Clone)]
 struct Sticks {
@@ -108,10 +109,10 @@ impl PerChild for SticksPerChild {
 }
 
 impl SticksPerChild {
-    fn new(n: usize) -> Self {
+    fn new(num_taken: usize) -> Self {
         Self {
             uct: uct::PerChild::new(),
-            num_taken: n
+            num_taken
         }
     }
 }
@@ -172,15 +173,15 @@ impl Process for SticksProcess {
 
     fn update(&self, state: &Self::State, per_child: &Self::PerChild, update: &Self::Update, _: bool) {
         state.uct.update();
-        per_child.uct.update(&if state.side == update.side {
-            update.uct.clone()
+        if state.side == update.side {
+            per_child.uct.update(&update.uct);
         } else {
-            uct::Update::new(1.0 - update.uct.value())
-        });
+            per_child.uct.update(&uct::Update::new(1.0 - update.uct.value()));
+        }
     }
 }
 
-fn inner_search(search_tree: &Mcts<SticksProcess>, limit: u32, _: usize) {
+fn inner_search(search_tree: &Mcts<SticksProcess>, limit: u32) {
     while search_tree.root().uct.visits() < limit {
         match search_tree.probe() {
             (trace, _) if trace.is_empty() => { panic!() },
@@ -203,41 +204,39 @@ fn inner_search(search_tree: &Mcts<SticksProcess>, limit: u32, _: usize) {
     }
 }
 
-pub fn search(num_threads: usize, limit: u32) -> Mcts<SticksProcess> {
+pub fn search(thread_pool: &mut ThreadPool, num_threads: usize, limit: u32) -> Mcts<SticksProcess> {
     let barrier = Arc::new(Barrier::new(num_threads));
     let search_tree = Arc::new(Mcts::new(
         SticksProcess::new(),
         SticksState::new(1, Sticks::new())
     ));
 
-    let handles = (0..num_threads - 1).map(|thread_id| {
+    for _ in 0..(num_threads - 1) {
         let barrier = barrier.clone();
         let search_tree = search_tree.clone();
 
-        thread::spawn(move || {
+        thread_pool.execute(move || {
             barrier.wait();
-            inner_search(search_tree.deref(), limit, thread_id);
+            inner_search(&*search_tree, limit);
         })
-    }).collect::<Vec<_>>();
-
-    barrier.wait();
-    inner_search(search_tree.deref(), limit, num_threads - 1);
-
-    for handle in handles {
-        handle.join().unwrap();
     }
 
+    barrier.wait();
+    inner_search(&*search_tree, limit);
+
+    thread_pool.join();
     Arc::try_unwrap(search_tree).map_err(|_| ()).unwrap()
 }
 
 fn sticks_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("sticks");
+    let mut pool = ThreadPool::new(4);
 
-    group.bench_function("1 100", |b| b.iter(|| search(1, black_box(100))));
-    group.bench_function("1 1000", |b| b.iter(|| search(1, black_box(1000))));
-    group.bench_function("1 10000", |b| b.iter(|| search(1, black_box(10000))));
-    group.bench_function("2 10000", |b| b.iter(|| search(2, black_box(10000))));
-    group.bench_function("4 10000", |b| b.iter(|| search(4, black_box(10000))));
+    group.bench_function("1 100", |b| b.iter(|| search(&mut pool, 1, black_box(100))));
+    group.bench_function("1 1000", |b| b.iter(|| search(&mut pool, 1, black_box(1000))));
+    group.bench_function("1 10000", |b| b.iter(|| search(&mut pool, 1, black_box(10000))));
+    group.bench_function("2 10000", |b| b.iter(|| search(&mut pool, 2, black_box(10000))));
+    group.bench_function("4 10000", |b| b.iter(|| search(&mut pool, 4, black_box(10000))));
 }
 
 criterion_group!(benches, sticks_benchmark);

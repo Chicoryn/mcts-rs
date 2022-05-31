@@ -23,6 +23,7 @@ criterion = "0.3"
 goban = "0.17"
 ordered-float = "3.0"
 rand = "0.8"
+threadpool = "1.8"
 
 [dependencies]
 crossbeam-epoch = "0.9"
