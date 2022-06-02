@@ -74,8 +74,11 @@ impl<P: Process> Node<P> {
         loop {
             let mut edges = unsafe { current.deref() }.clone();
 
-            edges.push(edge.clone());
-            edges.sort_unstable_by_key(|edge| edge.key());
+            if let Err(at) = edges.binary_search_by_key(&edge.key(), |edge| edge.key()) {
+                edges.insert(at, edge.clone());
+            } else {
+                break
+            }
 
             match self.edges.compare_exchange_weak(current, Owned::new(edges), Ordering::AcqRel, Ordering::Relaxed, pin) {
                 Ok(_) => {
