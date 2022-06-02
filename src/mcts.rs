@@ -64,7 +64,15 @@ impl<P: Process> Mcts<P> {
         PathIter::new(&self.process, self.root)
     }
 
-    /// Returns a trace
+    /// Returns a `trace` which represents the best path through this tree to
+    /// explore at this moment according to the given monte-carlo process and
+    /// selection criteria.
+    ///
+    /// Returns `ProbeStatus::Expanded` if the `trace` contains a previously
+    /// unexplored edge as its final step; `ProbeStatus::Busy` if the final edge
+    /// exist but has not yet been expanded yet; and `ProbeStatus::Empty` if
+    /// the current selection criterias yielded a terminal node, which has no
+    /// more edges to traverse.
     pub fn probe<'a>(&'a self) -> (Trace<'a, P, Node<P>>, ProbeStatus) {
         let pin = Rc::new(epoch::pin());
         let mut trace = Trace::new();
